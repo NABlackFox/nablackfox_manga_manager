@@ -59,6 +59,46 @@ def is_inside(child, parent):
   child, parent = child.resolve(), parent.resolve()
   return child == parent or parent in child.parents
 
+def build_merged_name(first_folder, chapter_count):
+  """Build the output folder name from the first chapter's folder name.
+
+  'nhentai-655935 - [Author] Title [English] [Tag] ['
+    -> '[Author] 655935 Title Chapters 1-N'
+  Returns None if the name does not follow the nhentai pattern.
+  """
+  match = re.match(r"^nhentai-(\d+)\s*-\s*(\[[^\]]*\])\s*(.*)$", first_folder.name)
+  if not match:
+    return None
+
+  code, author, rest = match.groups()
+  rest = re.sub(r"\[[^\]]*\]", "", rest)  # remove every [tag]
+  rest = re.sub(r"\[[^\]]*$", "", rest)  # remove a cut-off tag like " ["
+  rest = re.sub(r"\s+", " ", rest).strip()
+
+  name = " ".join(part for part in (author, code, rest) if part)
+  name = re.sub(r'[<>:"/\\|?*]', "", name)  # characters Windows does not allow
+  chapters = f"Chapters 1-{chapter_count}"
+  return f"{name} {chapters}".rstrip(". ")
+
+def ask_for_output_folder(default_output):
+  """Show the default output folder and ask y/n. If no, a path must be typed."""
+  print(f"\nThe merged folder will be:\n{default_output}")
+
+  while True:
+    answer = input("Use this folder? (y/n): ").strip().lower()
+    if answer in ("y", "n"):
+      break
+    print("  Please type y or n.")
+
+  if answer == "y":
+    return default_output
+
+  while True:
+    text = clean_path(input("Enter the output folder path: "))
+    if text:
+      return Path(text)
+    print("  You need to enter a path.")
+
 def move_to_recycle_bin(folder):
   """Send a folder to the recycle bin (it can be restored from there)."""
   send2trash(str(folder))
@@ -67,15 +107,11 @@ def manga_merger():
   # 1. Get the source folders (merged in the order entered)
   folders = ask_for_folders()
 
-  # 2. Get output folder (or use default next to the first source folder)
-  default_output = folders[0].parent / "merged_output"
-  out_text = clean_path(
-      input(
-          f"\nEnter the output folder path\n(Press Enter to use"
-          f" [{default_output}]): "
-      )
-  )
-  output_folder = Path(out_text) if out_text else default_output
+  # 2. Get output folder (default: named from the first chapter, placed next
+  # to the first source folder)
+  merged_name = build_merged_name(folders[0], len(folders)) or "merged_output"
+  default_output = folders[0].parent / merged_name
+  output_folder = ask_for_output_folder(default_output)
 
   # Do not let the output folder be (or sit inside) one of the source folders,
   # otherwise sending the sources to the recycle bin would take it along
