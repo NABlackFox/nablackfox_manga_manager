@@ -64,15 +64,21 @@ def build_merged_name(first_folder, chapter_count):
 
   'nhentai-655935 - [Author] Title [English] [Tag] ['
     -> '[Author] 655935 Title Chapters 1-N'
+  'nhentai-225475 - (C93) [Author] Title [English] {site.com}'
+    -> '[Author] 225475 Title Chapters 1-N'
+  Anything before the author [..] (like the event "(C93)") and everything
+  after the title (tags in [] or {}) is dropped.
   Returns None if the name does not follow the nhentai pattern.
   """
-  match = re.match(r"^nhentai-(\d+)\s*-\s*(\[[^\]]*\])\s*(.*)$", first_folder.name)
+  match = re.match(
+      r"^nhentai-(\d+)\s*-\s*[^\[]*(\[[^\]]*\])\s*(.*)$", first_folder.name
+  )
   if not match:
     return None
 
   code, author, rest = match.groups()
-  rest = re.sub(r"\[[^\]]*\]", "", rest)  # remove every [tag]
-  rest = re.sub(r"\[[^\]]*$", "", rest)  # remove a cut-off tag like " ["
+  # Everything from the next "[" or "{" onward is tags, so cut it off
+  rest = re.split(r"[\[{]", rest, maxsplit=1)[0]
   rest = re.sub(r"\s+", " ", rest).strip()
 
   name = " ".join(part for part in (author, code, rest) if part)
