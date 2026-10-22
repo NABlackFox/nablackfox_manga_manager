@@ -2,6 +2,8 @@ from pathlib import Path
 import re
 import shutil
 
+from send2trash import send2trash  # pip install send2trash
+
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"}
 
 def natural_key(path):
@@ -52,6 +54,15 @@ def list_images(folder):
   images.sort(key=natural_key)
   return images
 
+def is_inside(child, parent):
+  """True if child is the same as parent or located somewhere inside it."""
+  child, parent = child.resolve(), parent.resolve()
+  return child == parent or parent in child.parents
+
+def move_to_recycle_bin(folder):
+  """Send a folder to the recycle bin (it can be restored from there)."""
+  send2trash(str(folder))
+
 def manga_merger():
   # 1. Get the source folders (merged in the order entered)
   folders = ask_for_folders()
@@ -66,9 +77,10 @@ def manga_merger():
   )
   output_folder = Path(out_text) if out_text else default_output
 
-  # Do not let the output folder be one of the source folders
-  if output_folder.resolve() in [f.resolve() for f in folders]:
-    print("Error: The output folder cannot be one of the source folders.")
+  # Do not let the output folder be (or sit inside) one of the source folders,
+  # otherwise sending the sources to the recycle bin would take it along
+  if any(is_inside(output_folder, f) for f in folders):
+    print("Error: The output folder cannot be inside one of the source folders.")
     return
 
   # 3. Collect all images, folder by folder, then number them continuously
@@ -85,6 +97,10 @@ def manga_merger():
   # Zero-padding grows automatically (at least 3 digits)
   width = max(3, len(str(len(plan))))
   print(f"\nTotal: {len(plan)} images -> {output_folder}")
+  print(
+      f"After merging, the {len(folders)} source folder(s) will be moved to"
+      " the recycle bin."
+  )
 
   # 4. Warn before writing into a folder that already has files
   if output_folder.exists() and any(output_folder.iterdir()):
@@ -105,9 +121,26 @@ def manga_merger():
     shutil.copy2(file, output_folder / new_name)
     print(f"Copied: [{label}] {file.name} -> {new_name}")
 
+  # 6. Only after every page was copied, send the source folders to the bin
+  copied = len(list_images(output_folder))
+  if copied < len(plan):
+    print(
+        f"\nWarning: expected at least {len(plan)} images in the output folder"
+        f" but found {copied}. The source folders were NOT touched."
+    )
+    return
+
+  print()
+  for folder in folders:
+    try:
+      move_to_recycle_bin(folder)
+      print(f"Recycle bin: {folder}")
+    except Exception as error:
+      print(f"Could not recycle {folder} ({error})")
+
   print(
-      "\nProcessing completed successfully! Your original files are safe and"
-      " untouched."
+      "\nProcessing completed successfully! The source folders are in the"
+      " recycle bin if you need them back."
   )
 
 if __name__ == "__main__":
