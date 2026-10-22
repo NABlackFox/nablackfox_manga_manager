@@ -31,10 +31,10 @@ def ask_for_author_folder():
     print("  Not a valid folder, try again.")
 
 def unzip_one(zip_file, output_folder):
-  """Unzip one zip into its own folder, then delete meta.json from it.
+  """Unzip one zip into its own folder, delete meta.json, then delete the zip.
 
-  If anything fails, the half-extracted folder is removed so the zip is
-  picked up again on the next run.
+  If extraction fails, the half-extracted folder is removed and the zip is
+  kept, so it is picked up again on the next run.
   """
   try:
     with zipfile.ZipFile(zip_file) as zf:
@@ -43,6 +43,9 @@ def unzip_one(zip_file, output_folder):
   except Exception:
     shutil.rmtree(output_folder, ignore_errors=True)
     raise
+
+  # Only reached when the extraction fully succeeded
+  zip_file.unlink()
 
 def manga_unzipper():
   # 1. Ask for the author folder
@@ -59,6 +62,7 @@ def manga_unzipper():
     print("Nothing to unzip.")
     return
 
+  print("Each zip will be deleted after it is unzipped successfully.")
   answer = input("Continue? (y/n): ").strip().lower()
   if answer != "y":
     print("Cancelled. Nothing was changed.")
@@ -80,7 +84,7 @@ def manga_unzipper():
     for name in failed:
       print(f"  - {name}")
   else:
-    print("\nProcessing completed successfully! The original zips are untouched.")
+    print("\nProcessing completed successfully! The unzipped zip files were deleted.")
 
 
 if __name__ == "__main__":
