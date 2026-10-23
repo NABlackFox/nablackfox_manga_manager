@@ -1,6 +1,7 @@
 import ctypes
 import math
 import os
+import re
 import shutil
 import sys
 import unicodedata
@@ -8,9 +9,19 @@ from pathlib import Path
 
 from prompt_toolkit import prompt  # pip install prompt_toolkit
 from prompt_toolkit.completion import WordCompleter
+from prompt_toolkit.key_binding import KeyBindings
+
+import unzip_manga  # same folder as this file
 
 # Mother folder: contains one folder per author, each holding the manga folders
 MANGA_ROOT = Path(r"C:\NABlackFoxDisk\Pic\noncheck")
+
+# The three functions offered for an author (key -> label)
+FUNCTIONS = {
+    "1": "Unzip manga",
+    "2": "Merge manga",
+    "3": "Append chapters",
+}
 
 # Terminal colors (ANSI)
 RESET = "\033[0m"
@@ -140,13 +151,164 @@ def ask_for_author(authors):
       return lookup[text.lower()]
     error = f'No author folder named "{text}". Try again.'
 
-def author_menu(author):
-  """Temporary submenu: only shows the chosen author for now."""
+def natural_key(name):
+  """Sort key that orders names by the numbers inside them (2 before 10)."""
+  return [
+      int(part) if part.isdigit() else part.lower()
+      for part in re.split(r"(\d+)", name)
+  ]
+
+def list_entries(folder):
+  """Return everything at the first level of a folder (hidden items skipped)."""
+  try:
+    entries = [f for f in folder.iterdir() if not f.name.startswith(".")]
+  except OSError:
+    return []
+  return sorted(entries, key=lambda f: natural_key(f.name))
+
+def print_overview(folder):
+  """Quick overview of a folder, one entry per line like `ls`."""
+  entries = list_entries(folder)
+  folder_count = sum(1 for e in entries if e.is_dir())
+  zip_count = sum(
+      1 for e in entries if e.is_file() and e.suffix.lower() == ".zip"
+  )
+
+  print(
+      f"  {BOLD}Contents{RESET}"
+      f" {DIM}({folder_count} folders, {zip_count} zips){RESET}\n"
+  )
+  if not entries:
+    print(f"  {DIM}(empty){RESET}")
+  for entry in entries:
+    if entry.is_dir():
+      print(f"  {CYAN}{entry.name}/{RESET}")
+    elif entry.suffix.lower() == ".zip":
+      print(f"  {RED}{entry.name}{RESET}")
+    else:
+      print(f"  {entry.name}")
+  print()
+
+def read_choice():
+  """Wait for one key: 1-3 picks a function, Esc goes back (no Enter needed)."""
+  kb = KeyBindings()
+
+  @kb.add("<any>")
+  def _ignore(event):
+    pass  # swallow other keys so nothing is typed on screen
+
+  for key in FUNCTIONS:
+    @kb.add(key, eager=True)
+    def _pick(event, key=key):
+      event.app.exit(result=key)
+
+  @kb.add("escape", eager=True)
+  def _back(event):
+    event.app.exit(result="esc")
+
+  return prompt("  > ", key_bindings=kb)
+
+def read_confirm(question):
+  """Ask a yes/no question and wait for one key: y = yes, n or Esc = no."""
+  kb = KeyBindings()
+
+  @kb.add("<any>")
+  def _ignore(event):
+    pass  # swallow other keys so nothing is typed on screen
+
+  for key in ("y", "Y"):
+    @kb.add(key, eager=True)
+    def _yes(event):
+      event.app.exit(result=True)
+
+  for key in ("n", "N", "escape"):
+    @kb.add(key, eager=True)
+    def _no(event):
+      event.app.exit(result=False)
+
+  return prompt(question, key_bindings=kb)
+
+def ask_continue(zips):
+  """Show the zips that are ready to be unzipped, then ask to continue."""
+  print(f"  {BOLD}Ready to unzip{RESET}\n")
+  for zip_file in zips:
+    print(f"  {RED}{zip_file.name}{RESET}")
+  print(
+      f"\n  {DIM}Each zip is deleted after it is unzipped successfully.{RESET}\n"
+  )
+  return read_confirm("  Continue? (y/n) ")
+
+def run_unzip(author):
+  """Function 1: unzip every new zip in the author folder."""
   clear_screen()
   print_header(f"Library: {MANGA_ROOT}")
-  print(f"  {BOLD}Author:{RESET} {GREEN}{author}{RESET}\n")
-  print(f"  {DIM}(Functions will be added here later.){RESET}\n")
-  input(f"  {DIM}Press Enter to go back to the main menu...{RESET}")
+  print(
+      f"  {BOLD}Unzip manga{RESET} {DIM}-{RESET} {GREEN}{author}{RESET}\n"
+  )
+  folder = MANGA_ROOT / author
+  to_unzip, skipped = unzip_manga.find_new_zips(folder)
+
+  print(
+      f"  Found {BOLD}{len(to_unzip) + skipped}{RESET} zip(s):"
+      f" {GREEN}{len(to_unzip)} new{RESET},"
+      f" {DIM}{skipped} already unzipped{RESET}.\n"
+  )
+
+  if not to_unzip:
+    print("  Nothing to unzip.")
+  elif not ask_continue(to_unzip):
+    print(f"\n  Cancelled. Nothing was changed.")
+  else:
+    print()
+    failed = []
+    for number, zip_file, error in unzip_manga.unzip_zips(folder, to_unzip):
+      progress = f"[{number}/{len(to_unzip)}]"
+      if error is None:
+        print(f"  {progress} {GREEN}OK{RESET}      {zip_file.name}")
+      else:
+        print(f"  {progress} {RED}FAILED{RESET}  {zip_file.name} ({error})")
+        failed.append(zip_file.name)
+
+    if failed:
+      print(f"\n  {RED}Finished with {len(failed)} failure(s):{RESET}")
+      for name in failed:
+        print(f"    - {name}")
+      print(f"  {DIM}The failed zips were kept, so you can try again.{RESET}")
+    else:
+      print(
+          f"\n  {GREEN}Done!{RESET} {len(to_unzip)} zip(s) unzipped and deleted."
+      )
+
+  print()
+  input(f"  {DIM}Press Enter to go back...{RESET}")
+
+def author_menu(author):
+  """Author screen: folder overview, the three functions, Esc to go back."""
+  message = ""
+  while True:
+    clear_screen()
+    print_header(f"Library: {MANGA_ROOT}")
+    print(f"  {BOLD}Author:{RESET} {GREEN}{author}{RESET}\n")
+    print_overview(MANGA_ROOT / author)
+
+    print(f"  {BOLD}Functions{RESET}\n")
+    for key, name in FUNCTIONS.items():
+      print(f"  {YELLOW}{key}{RESET}  {name}")
+    print(
+        f"\n  {DIM}Press 1-{len(FUNCTIONS)} to choose, Esc to go back,"
+        f" Ctrl+C to exit.{RESET}\n"
+    )
+    if message:
+      print(f"  {GREEN}{message}{RESET}\n")
+
+    choice = read_choice()
+    if choice == "esc":
+      return
+    if choice == "1":
+      run_unzip(author)
+      message = ""
+      continue
+    message =f"Function chosen: {FUNCTIONS[choice]} (not connected yet)"
 
 def main():
   enable_ansi()
