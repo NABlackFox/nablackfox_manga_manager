@@ -1,4 +1,5 @@
-
+import os
+from dotenv import load_dotenv
 import re
 import shutil
 from collections import defaultdict
@@ -8,13 +9,16 @@ from utils import GREEN, YELLOW, RED, DIM, RESET
 
 
 # TODO: Change this to the folder where your downloaded ZIP files are stored.
-ZIP_SOURCE_FOLDER = Path(r"C:\Users\M16r2\Downloads")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(PROJECT_ROOT / ".env")
 
+ZIP_SOURCE_FOLDER = Path(
+    os.getenv("ZIP_SOURCE_FOLDER", str(Path.home() / "Downloads"))
+).expanduser()
 
 def normalize_name(name):
     """Normalize text for case-insensitive, punctuation-tolerant matching."""
     return " ".join(re.findall(r"[a-z0-9]+", name.casefold()))
-
 
 def extract_author_text(filename):
     """

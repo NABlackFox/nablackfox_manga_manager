@@ -9,3 +9,16 @@ __pycache__/
 
 # Ignore contents of the test folder
 test/*
+
+# Local environment configuration
+.env
+.env.*
+
+# Allow the example configuration
+!.env.example
+
+# Python-generated files
+__pycache__/
+*.py[cod]
+.venv/
+venv/

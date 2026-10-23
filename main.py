@@ -5,7 +5,17 @@ from pages.author_menu import ask_for_author, run_author_menu
 from pages.admin_menu import run_admin_menu
 
 # Mother folder: contains one folder per author, each holding the manga folders
-MANGA_ROOT = Path(r"C:\NABlackFoxDisk\Pic\noncheck")
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load the .env file from the project directory.
+PROJECT_ROOT = Path(__file__).resolve().parent
+load_dotenv(PROJECT_ROOT / ".env")
+
+MANGA_ROOT = Path(
+    os.getenv("MANGA_ROOT", str(PROJECT_ROOT / "manga"))
+).expanduser()
 
 def main():
   enable_ansi()
