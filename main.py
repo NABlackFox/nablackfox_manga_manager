@@ -11,7 +11,8 @@ from prompt_toolkit import prompt  # pip install prompt_toolkit
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.key_binding import KeyBindings
 
-import merge_manga  # same folder as this file
+import manga_chapter_appender  # same folder as this file
+import merge_manga
 import unzip_manga
 
 # Mother folder: contains one folder per author, each holding the manga folders
@@ -71,6 +72,10 @@ def print_header(subtitle=""):
   if subtitle:
     print(f"{DIM}  {subtitle}{RESET}")
   print(f"{CYAN}{line}{RESET}\n")
+
+def print_title(title, author):
+  """Print the function title and the author name under the banner."""
+  print(f"  {BOLD}{title}{RESET} {DIM}-{RESET} {GREEN}{author}{RESET}\n")
 
 def group_key(name):
   """Letter heading for an author: 'A'-'Z', or '#' for numbers and symbols."""
@@ -311,11 +316,14 @@ def parse_selection(text, count):
     numbers.extend(range(start, end + 1))
   return numbers
 
-def show_merge_screen(author, folders, chosen, error=""):
+def show_merge_screen(
+    author, folders, chosen, error="", title="Merge manga", note="",
+    verb="merged"
+):
   """Numbered folder list, the order picked so far, and the instructions."""
   clear_screen()
   print_header(f"Library: {MANGA_ROOT}")
-  print(f"  {BOLD}Merge manga{RESET} {DIM}-{RESET} {GREEN}{author}{RESET}\n")
+  print_title(title, author)
 
   digits = len(str(len(folders)))
   for number, folder in enumerate(folders, start=1):
@@ -326,28 +334,33 @@ def show_merge_screen(author, folders, chosen, error=""):
   print()
 
   if chosen:
-    print(f"  {BOLD}Merge order so far{RESET}\n")
+    print(f"  {BOLD}Order so far{RESET}\n")
     for folder in chosen:
       print(f"  {folder.name}")
     print()
 
   print(
-      f"  {DIM}Enter the number of each folder in the order it should be merged"
+      f"  {DIM}Enter the number of each folder in the order it should be {verb}"
       f" (e.g. 3, or 1 4 2, or 5-9).{RESET}"
   )
   print(
       f"  {DIM}Press Enter on an empty line when you are done."
       f"  Esc to cancel.{RESET}\n"
   )
+  if note:
+    print(f"  {note}\n")  # right above the prompt, so it is never scrolled away
   if error:
     print(f"  {RED}{error}{RESET}\n")
 
-def ask_merge_order(author, folders):
-  """Ask for the folders by number, in merge order. None means cancelled."""
+def ask_merge_order(author, folders, **screen):
+  """Ask for the folders by number, in order. None means cancelled.
+
+  `screen` (title, note, verb) is passed on to show_merge_screen.
+  """
   chosen = []
   error = ""
   while True:
-    show_merge_screen(author, folders, chosen, error)
+    show_merge_screen(author, folders, chosen, error, **screen)
     error = ""
     text = read_text(f"  Folder {len(chosen) + 1} > ")
     if text is None:
@@ -375,11 +388,11 @@ def ask_merge_order(author, folders):
     if already:
       error = f"Already added, skipped: {', '.join(already)}"
 
-def merge_message_screen(author, lines):
-  """Show a short message under the Merge title and wait for Enter."""
+def merge_message_screen(author, lines, title="Merge manga"):
+  """Show a short message under the function title and wait for Enter."""
   clear_screen()
   print_header(f"Library: {MANGA_ROOT}")
-  print(f"  {BOLD}Merge manga{RESET} {DIM}-{RESET} {GREEN}{author}{RESET}\n")
+  print_title(title, author)
   for line in lines:
     print(f"  {line}")
   print()
@@ -429,11 +442,15 @@ def run_merge(author):
 
   clear_screen()
   print_header(f"Library: {MANGA_ROOT}")
-  print(f"  {BOLD}Merge manga{RESET} {DIM}-{RESET} {GREEN}{author}{RESET}\n")
+  print_title("Merge manga", author)
   print(f"  {BOLD}Merge order{RESET}\n")
-  for folder in chosen:
+  digits = len(str(len(chosen)))
+  for number, folder in enumerate(chosen, start=1):
     count = pages.get(folder.name, 0)
-    print(f"  {CYAN}{folder.name}{RESET} {DIM}({count} pages){RESET}")
+    print(
+        f"  {YELLOW}{number:>{digits}}.{RESET} {CYAN}{folder.name}{RESET}"
+        f" {DIM}({count} page{'' if count == 1 else 's'}){RESET}"
+    )
   print(f"\n  {BOLD}Output folder{RESET}\n")
   print(f"  {GREEN}{merged_name}{RESET}\n")
   print(
@@ -488,6 +505,208 @@ def run_merge(author):
   print()
   input(f"  {DIM}Press Enter to go back...{RESET}")
 
+def pause():
+  """Wait for Enter so the person can read the screen."""
+  input(f"  {DIM}Press Enter to go back...{RESET}")
+
+def ask_single_folder(author, folders, title, question):
+  """Show the numbered folders and ask for exactly one. None means cancelled."""
+  error = ""
+  while True:
+    clear_screen()
+    print_header(f"Library: {MANGA_ROOT}")
+    print_title(title, author)
+    digits = len(str(len(folders)))
+    for number, folder in enumerate(folders, start=1):
+      print(f"  {YELLOW}{number:>{digits}}{RESET}  {CYAN}{folder.name}{RESET}")
+    print(f"\n  {DIM}{question}  Esc to cancel.{RESET}\n")
+    if error:
+      print(f"  {RED}{error}{RESET}\n")
+      error = ""
+
+    text = read_text("  Folder > ")
+    if text is None:
+      return None
+    try:
+      numbers = parse_selection(text, len(folders))
+    except ValueError as exc:
+      error = str(exc)
+      continue
+    if len(numbers) != 1:
+      error = "Enter exactly one number."
+      continue
+    return folders[numbers[0] - 1]
+
+def run_append(author):
+  """Function 3: add new chapter folders to an already merged manga folder."""
+  title = "Append chapters"
+  author_folder = MANGA_ROOT / author
+  folders = merge_manga.list_subfolders(author_folder)
+  if len(folders) < 2:
+    merge_message_screen(
+        author,
+        ["You need the merged folder and at least one new chapter folder."],
+        title,
+    )
+    return
+
+  # 1. Which folder is the already merged manga?
+  merged_folder = ask_single_folder(
+      author, folders, title,
+      "Enter the number of the already merged manga folder.",
+  )
+  if merged_folder is None:
+    return
+
+  # 2. Which folders should be added, in which order?
+  candidates = [f for f in folders if f != merged_folder]
+  chosen = ask_merge_order(
+      author, candidates, title=title, verb="added",
+      note=f"Appending to: {GREEN}{merged_folder.name}{RESET}",
+  )
+  if chosen is None:
+    return
+
+  # 3. Work out what will happen
+  info = manga_chapter_appender.scan_merged_folder(merged_folder)
+  plan = merge_manga.build_plan(chosen)
+  if not plan:
+    merge_message_screen(
+        author,
+        [f"{RED}No image files found in the selected folders.{RESET}"],
+        title,
+    )
+    return
+
+  first_new, final_number, width, needs_repad = (
+      manga_chapter_appender.numbering(info, len(plan))
+  )
+
+  # The folder name holds the chapter range, so it has to grow as well
+  renamed_folder = manga_chapter_appender.build_updated_folder(
+      merged_folder, len(chosen)
+  )
+  rename_note = ""
+  if renamed_folder is None:
+    rename_note = (
+        "The folder name does not end with 'Chapters 1-N', so it will not be"
+        " renamed."
+    )
+  elif renamed_folder.exists():
+    rename_note = (
+        f"{renamed_folder.name} already exists, so the folder will not be"
+        " renamed."
+    )
+    renamed_folder = None
+
+  # 4. Show the result and ask to continue
+  pages = {}
+  for _file, label in plan:
+    pages[label] = pages.get(label, 0) + 1
+
+  clear_screen()
+  print_header(f"Library: {MANGA_ROOT}")
+  print_title(title, author)
+  print(f"  {BOLD}Appending to{RESET}\n")
+  print(f"  {GREEN}{merged_folder.name}{RESET}")
+  if info.existing:
+    print(
+        f"  {DIM}({len(info.existing)} pages, last page"
+        f" {info.last_number}){RESET}"
+    )
+  else:
+    print(f"  {DIM}(no numbered pages yet, starting from 1){RESET}")
+  if info.ignored:
+    print(
+        f"  {DIM}{info.ignored} image(s) with non-numeric names are"
+        f" ignored.{RESET}"
+    )
+
+  print(f"\n  {BOLD}Chapters to add{RESET}\n")
+  digits = len(str(len(chosen)))
+  for number, folder in enumerate(chosen, start=1):
+    count = pages.get(folder.name, 0)
+    print(
+        f"  {YELLOW}{number:>{digits}}.{RESET} {CYAN}{folder.name}{RESET}"
+        f" {DIM}({count} page{'' if count == 1 else 's'}){RESET}"
+    )
+  print(
+      f"\n  {len(plan)} new pages will be added as"
+      f" {first_new:0{width}d} to {final_number:0{width}d}."
+  )
+
+  if renamed_folder is not None:
+    print(f"\n  {BOLD}New folder name{RESET}\n")
+    print(f"  {GREEN}{renamed_folder.name}{RESET}")
+  elif rename_note:
+    print(f"\n  {YELLOW}{rename_note}{RESET}")
+
+  if needs_repad:
+    print(
+        f"\n  {YELLOW}The page count now needs {width} digits, so the"
+        f" {len(info.existing)} existing pages will be renamed to {width}"
+        f" digits (for example 999 -> 0999).{RESET}"
+    )
+  print(
+      f"\n  After adding, the {len(chosen)} new chapter folder(s) are moved to"
+      " the recycle bin.\n"
+  )
+
+  if not read_confirm("  Continue? (y/n) "):
+    print("\n  Cancelled. Nothing was changed.\n")
+    pause()
+    return
+
+  # 5. Re-pad the existing pages if needed, then copy the new ones
+  print()
+  try:
+    if needs_repad:
+      manga_chapter_appender.repad_existing(info, width)
+    for number, total in manga_chapter_appender.copy_pages(
+        plan, merged_folder, first_new, width
+    ):
+      print(f"\r  Copying pages... {number}/{total}", end="", flush=True)
+    print()
+  except Exception as error:
+    print(f"\n\n  {RED}Failed: {error}{RESET}")
+    print(
+        "  The new chapter folders were NOT touched."
+        " Some pages may already have been added.\n"
+    )
+    pause()
+    return
+
+  # 6. Only after every page was copied, update the name and use the bin
+  expected = len(info.all_images) + len(plan)
+  copied = len(merge_manga.list_images(merged_folder))
+  if copied < expected:
+    print(
+        f"\n  {RED}Warning: expected at least {expected} images in the merged"
+        f" folder but found {copied}.{RESET}"
+    )
+    print("  The new chapter folders were NOT touched.\n")
+    pause()
+    return
+
+  print()
+  if renamed_folder is not None:
+    try:
+      merged_folder.rename(renamed_folder)
+      print(f"  {GREEN}Renamed{RESET}  {renamed_folder.name}\n")
+    except Exception as error:
+      print(f"  {RED}Could not rename the merged folder ({error}){RESET}\n")
+
+  for folder, error in merge_manga.recycle_folders(chosen):
+    if error is None:
+      print(f"  {GREEN}OK{RESET}      {folder.name}")
+    else:
+      print(f"  {RED}FAILED{RESET}  {folder.name} ({error})")
+  print(
+      f"\n  {GREEN}Done!{RESET} {len(plan)} pages added. The new chapter"
+      " folders are in the recycle bin\n  if you need them back.\n"
+  )
+  pause()
+
 def author_menu(author):
   """Author screen: folder overview, the three functions, Esc to go back."""
   message = ""
@@ -510,11 +729,9 @@ def author_menu(author):
     choice = read_choice()
     if choice == "esc":
       return
-    if choice in ("1", "2"):
-      (run_unzip if choice == "1" else run_merge)(author)
-      message = ""
-      continue
-    message =f"Function chosen: {FUNCTIONS[choice]} (not connected yet)"
+    runners = {"1": run_unzip, "2": run_merge, "3": run_append}
+    runners[choice](author)
+    message = ""
 
 def main():
   enable_ansi()
