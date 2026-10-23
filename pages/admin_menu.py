@@ -11,8 +11,8 @@ from utils import (
 
 
 FUNCTIONS = {
-    "1": "Convert thumbnail",
-    "2": "Grab zip file",
+    "1": "Grab zip file",
+    "2": "Convert thumbnail",
 }
 
 
@@ -56,7 +56,7 @@ def run_admin_menu(manga_root):
             return
 
         if choice == "1":
-            convert_thumbnails(manga_root)
+            grab_zip_files(manga_root)
 
         elif choice == "2":
-            grab_zip_files(manga_root)
+            convert_thumbnails(manga_root)
