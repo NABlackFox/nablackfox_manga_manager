@@ -1,6 +1,7 @@
 
 from prompt_toolkit import prompt
 from prompt_toolkit.key_binding import KeyBindings
+from functions.convert_thumbnail import convert_thumbnails
 
 from utils import (
     BOLD, DIM, YELLOW, RESET,
@@ -53,5 +54,9 @@ def run_admin_menu(manga_root):
         if choice == "esc":
             return
 
-        # Both options are placeholders for now.
-        # Their functionality will be added later.
+        if choice == "1":
+            convert_thumbnails(manga_root)
+
+        elif choice == "2":
+            print("\nGrab zip file is not implemented yet.")
+            input("Press Enter to return to the admin menu...")
