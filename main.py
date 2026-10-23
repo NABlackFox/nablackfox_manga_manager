@@ -2,6 +2,7 @@ from pathlib import Path
 import sys
 from utils import RED, RESET, clear_screen, enable_ansi, print_header
 from pages.author_menu import ask_for_author, run_author_menu
+from pages.admin_menu import run_admin_menu
 
 # Mother folder: contains one folder per author, each holding the manga folders
 MANGA_ROOT = Path(r"C:\NABlackFoxDisk\Pic\noncheck")
@@ -22,7 +23,10 @@ def main():
         print_header(MANGA_ROOT, f"Library: {MANGA_ROOT}")
         print(f"  {RED}No author folders found in the library.{RESET}\n")
         return
-      run_author_menu(author, MANGA_ROOT)
+      if author.casefold() == "admin":
+        run_admin_menu(MANGA_ROOT)
+      else:
+        run_author_menu(author, MANGA_ROOT)
   except (KeyboardInterrupt, EOFError):
     pass
 

@@ -107,6 +107,11 @@ def ask_for_author(manga_root):
     if not text:
       error = ""
       continue
+
+    # Open admin menu when the user types "admin"
+    if text.casefold() == "admin":
+      return "admin"
+
     if text.lower() in lookup:
       return lookup[text.lower()]
     error = f'No author folder named "{text}". Try again.'
