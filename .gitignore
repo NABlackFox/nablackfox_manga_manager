@@ -1,25 +1,21 @@
-# Ignore all __pycache__ folders anywhere in the project
+# Python compiled files & cache
 **/__pycache__/
-__pycache__/
-
-# Ignore compiled Python files
+*.py[cod]
 *.pyc
 *.pyo
 *.pyd
 
-# Ignore contents of the test folder
+# Virtual environments
+.venv/
+venv/
+
+# Test outputs / contents
 test/*
 
 # Local environment configuration
 .env
 .env.*
-
-# Allow the example configuration
 !.env.example
 
-# Python-generated files
-__pycache__/
-*.py[cod]
-.venv/
-venv/
+# VS Code settings
 .vscode/
