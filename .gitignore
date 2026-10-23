@@ -1,2 +1,11 @@
+# Ignore all __pycache__ folders anywhere in the project
+**/__pycache__/
 __pycache__/
+
+# Ignore compiled Python files
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore contents of the test folder
 test/*
