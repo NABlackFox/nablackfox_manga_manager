@@ -35,8 +35,6 @@ def extract_author_text(filename):
 
     return match.group(1)
 
-
-
 def extract_author_candidates(filename):
     """
     Extract author candidates from the first bracket group.
@@ -70,8 +68,6 @@ def extract_author_candidates(filename):
         ]
 
     return [group]
-
-
 
 def find_matching_author(filename, author_folders):
     """Check candidate A first, then candidate B using safe prefix matching."""
@@ -110,6 +106,167 @@ def find_matching_author(filename, author_folders):
             )
 
     return None
+
+def prompt_create_missing_author_folders(unmatched, manga_root):
+    """Offer to create folders for unique unmatched authors."""
+
+    groups = {}
+
+    # Only offer folder creation for missing authors, not file conflicts.
+    for zip_file, reason in unmatched:
+        if reason != "no matching author":
+            continue
+
+        candidates = extract_author_candidates(zip_file.name)
+        if not candidates:
+            continue
+
+        key = tuple(normalize_name(name) for name in candidates)
+
+        if key not in groups:
+            groups[key] = {
+                "candidates": candidates,
+                "files": [],
+            }
+
+        groups[key]["files"].append(zip_file)
+
+    if not groups:
+        return
+
+    print(f"\n{YELLOW}{'=' * 45}{RESET}")
+    print(f"{YELLOW}CREATE MISSING AUTHOR FOLDERS{RESET}")
+    print(f"{YELLOW}Found {len(groups)} possible new author(s).{RESET}")
+    print(f"{YELLOW}{'=' * 45}{RESET}")
+
+    created_count = 0
+
+    for group in groups.values():
+        candidates = group["candidates"]
+        files = group["files"]
+
+        print(f"\n{DIM}{'-' * 45}{RESET}")
+        print(f"{GREEN}ZIP files for this author: {len(files)}{RESET}")
+
+        for zip_file in files:
+            print(f"  {zip_file.name}")
+
+        answer = input(
+            f"\n{YELLOW}Create a folder for these ZIPs? [y/N]: {RESET}"
+        ).strip().casefold()
+
+        if answer != "y":
+            print(f"{DIM}Skipped.{RESET}")
+            continue
+
+        print(f"\n{GREEN}Choose the folder name:{RESET}")
+        print(f"  1. Candidate A: {candidates[0]}")
+
+        if len(candidates) > 1:
+            print(f"  2. Candidate B: {candidates[1]}")
+
+        print("  3. Enter a custom folder name")
+        print("  0. Skip")
+
+        while True:
+            choice = input("Your choice: ").strip()
+
+            if choice == "0":
+                print(f"{DIM}Skipped.{RESET}")
+                break
+
+            if choice == "1":
+                folder_name = candidates[0]
+
+            elif choice == "2" and len(candidates) > 1:
+                folder_name = candidates[1]
+
+            elif choice == "3":
+                # Keep asking for a custom name until it is valid.
+                while True:
+                    folder_name = input(
+                        "Enter custom folder name: "
+                    ).strip()
+
+                    if not folder_name:
+                        print(f"{RED}Folder name cannot be empty.{RESET}")
+                        continue
+
+                    normalized_custom = normalize_name(folder_name)
+                    normalized_a = normalize_name(candidates[0])
+
+                    valid_name = normalized_custom == normalized_a
+
+                    if len(candidates) > 1:
+                        normalized_b = normalize_name(candidates[1])
+                        valid_name = valid_name or (
+                            normalized_b == normalized_custom
+                            or normalized_b.startswith(
+                                normalized_custom + " "
+                            )
+                        )
+
+                    if valid_name:
+                        break
+
+                    print(
+                        f"{RED}That name won't match these ZIPs "
+                        f"on the next run.{RESET}"
+                    )
+                    print(
+                        f"{DIM}Use Candidate A exactly, or a whole-word "
+                        f"prefix of Candidate B.{RESET}"
+                    )
+
+            else:
+                print(f"{RED}Invalid choice. Try again.{RESET}")
+                continue
+
+            normalized_name = normalize_name(folder_name)
+
+            existing_folder = next(
+                (
+                    folder
+                    for folder in manga_root.iterdir()
+                    if folder.is_dir()
+                    and normalize_name(folder.name) == normalized_name
+                ),
+                None,
+            )
+
+            if existing_folder:
+                print(
+                    f"{YELLOW}Folder already exists: "
+                    f"{existing_folder.name}{RESET}"
+                )
+                print(
+                    f"{DIM}No folder created for this author.{RESET}"
+                )
+                break
+
+            try:
+                (manga_root / folder_name).mkdir()
+                print(f"{GREEN}[CREATED] Folder: {folder_name}{RESET}")
+                print(f"{DIM}ZIP files have NOT been moved.{RESET}")
+                created_count += 1
+
+            except OSError as exc:
+                print(f"{RED}[FAILED] Could not create folder: {exc}{RESET}")
+
+            break
+
+    if created_count:
+        print(f"\n{GREEN}{'=' * 45}{RESET}")
+        print(f"{GREEN}Created {created_count} author folder(s).{RESET}")
+        print(
+            f"{YELLOW}NEXT STEP: Return to the Admin menu "
+            f"and select Option 2 - Grab zip file again.{RESET}"
+        )
+        print(
+            f"{DIM}The ZIPs will be checked again and moved only "
+            f"if they match. Nothing else will move automatically.{RESET}"
+        )
+        print(f"{GREEN}{'=' * 45}{RESET}")
 
 def grab_zip_files(manga_root):
     manga_root = Path(manga_root)
@@ -196,6 +353,8 @@ def grab_zip_files(manga_root):
 
     if total_matched == 0:
         print(f"\n{YELLOW}Nothing can be moved safely.{RESET}")
+        # Still offer to create folders for unmatched new authors.
+        prompt_create_missing_author_folders(unmatched, manga_root)
         input("\nPress Enter to return to the admin menu...")
         return
 
@@ -245,5 +404,7 @@ def grab_zip_files(manga_root):
     print(f"{RED}Failed: {failed}{RESET}")
     print(f"{YELLOW}Left in download folder: "
           f"{len(unmatched) + failed}{RESET}")
+
+    prompt_create_missing_author_folders(unmatched, manga_root)
 
     input("\nPress Enter to return to the admin menu...")
