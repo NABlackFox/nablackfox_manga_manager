@@ -2,6 +2,8 @@ from pathlib import Path
 import re
 import shutil
 
+from send2trash import send2trash  # pip install send2trash
+
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"}
 
 def natural_key(path):
@@ -11,11 +13,9 @@ def natural_key(path):
       for part in re.split(r"(\d+)", path.name)
   ]
 
-
 def clean_path(text):
   """Strip whitespace and surrounding quotes from a pasted path."""
   return text.strip().strip('"\'')
-
 
 def list_images(folder):
   """Return the image files in a folder, sorted by the number in the name."""
@@ -27,15 +27,39 @@ def list_images(folder):
   images.sort(key=natural_key)
   return images
 
+def is_inside(child, parent):
+  """True if child is the same as parent or located somewhere inside it."""
+  child, parent = child.resolve(), parent.resolve()
+  return child == parent or parent in child.parents
+
+def move_to_recycle_bin(folder):
+  """Send a folder to the recycle bin (it can be restored from there)."""
+  send2trash(str(folder))
+
+def build_updated_folder(merged_folder, added_chapters):
+  """Return the merged folder path with its 'Chapters 1-N' count increased.
+
+  '[Author] 655935 Title Chapters 1-5' + 3 new chapters
+    -> '[Author] 655935 Title Chapters 1-8'
+  Returns None if the folder name does not end with 'Chapters 1-N'.
+  """
+  match = re.search(r"^(.*Chapters\s+1-)(\d+)\s*$", merged_folder.name)
+  if not match:
+    return None
+
+  prefix, count = match.groups()
+  return merged_folder.with_name(f"{prefix}{int(count) + added_chapters}")
 
 def ask_for_merged_folder():
-  """Ask for the folder that already contains the merged pages."""
+  """Ask for the folder that already contains the merged pages.
+
+  New pages will be appended into this same folder.
+  """
   while True:
     text = clean_path(input("Enter the already merged folder: "))
     if text and Path(text).is_dir():
       return Path(text)
     print("  Not a valid folder, try again.")
-
 
 def ask_for_new_folders(merged_folder):
   """Ask for the new chapter folders. Press Enter on an empty line to finish."""
@@ -56,8 +80,11 @@ def ask_for_new_folders(merged_folder):
       print("  Not a valid folder, try again.")
       continue
 
-    if folder.resolve() == merged_folder.resolve():
-      print("  That is the merged folder itself, skipping.")
+    # The merged folder must not be a new folder, nor sit inside one, nor
+    # contain one (sending a new folder to the recycle bin would take the
+    # merged folder along, or the merged folder would be copied into itself)
+    if is_inside(folder, merged_folder) or is_inside(merged_folder, folder):
+      print("  That folder overlaps with the merged folder, skipping.")
       continue
 
     if folder.resolve() in [f.resolve() for f in folders]:
@@ -69,7 +96,7 @@ def ask_for_new_folders(merged_folder):
   return folders
 
 def manga_chapter_appender():
-  # 1. Read the existing merged folder
+  # 1. Read the existing merged folder (this is also the output folder)
   merged_folder = ask_for_merged_folder()
 
   all_images = list_images(merged_folder)
@@ -94,6 +121,7 @@ def manga_chapter_appender():
   # 2. Get the new chapter folders (added in the order entered)
   folders = ask_for_new_folders(merged_folder)
 
+  # 3. Collect all new images, folder by folder
   plan = []  # list of (source file, folder label)
   for folder in folders:
     images = list_images(folder)
@@ -113,10 +141,30 @@ def manga_chapter_appender():
   needs_repad = bool(existing) and width > existing_width
 
   print(
-      f"\n{len(plan)} new pages will be added as"
+      f"\nTotal: {len(plan)} new images will be added as"
       f" {first_new:0{width}d} to {final_number:0{width}d}"
       f" in:\n{merged_folder}"
   )
+  print(
+      f"After appending, the {len(folders)} new chapter folder(s) will be"
+      " moved to the recycle bin."
+  )
+
+  # The folder name holds the chapter range, so it has to grow as well
+  renamed_folder = build_updated_folder(merged_folder, len(folders))
+  if renamed_folder is None:
+    print(
+        "Note: the merged folder name does not end with 'Chapters 1-N',"
+        " so it will not be renamed."
+    )
+  elif renamed_folder.exists():
+    print(
+        f"Note: {renamed_folder.name} already exists, so the merged folder"
+        " will not be renamed."
+    )
+    renamed_folder = None
+  else:
+    print(f"The merged folder will be renamed to:\n{renamed_folder.name}")
 
   if needs_repad:
     print(
@@ -130,22 +178,48 @@ def manga_chapter_appender():
     print("Cancelled. Nothing was changed.")
     return
 
-  # 3. Re-pad existing file names only if the digit width has to grow
+  # 4. Re-pad existing file names only if the digit width has to grow
   if needs_repad:
     for number, file in existing:
       new_name = f"{number:0{width}d}{file.suffix}"
       file.rename(file.with_name(new_name))
 
-  # 4. Copy the new pages, continuing from the last page number
+  # 5. Copy the new pages, continuing from the last page number
   print()
   for number, (file, label) in enumerate(plan, start=first_new):
     new_name = f"{number:0{width}d}{file.suffix}"
     shutil.copy2(file, merged_folder / new_name)
     print(f"Copied: [{label}] {file.name} -> {new_name}")
 
+  # 6. Only after every page was copied, send the new folders to the bin
+  expected = len(all_images) + len(plan)
+  copied = len(list_images(merged_folder))
+  if copied < expected:
+    print(
+        f"\nWarning: expected at least {expected} images in the merged folder"
+        f" but found {copied}. The new chapter folders were NOT touched."
+    )
+    return
+
+  # 7. Update the chapter range in the merged folder's name
+  if renamed_folder is not None:
+    try:
+      merged_folder.rename(renamed_folder)
+      print(f"\nRenamed merged folder -> {renamed_folder.name}")
+    except Exception as error:
+      print(f"\nCould not rename the merged folder ({error})")
+
+  print()
+  for folder in folders:
+    try:
+      move_to_recycle_bin(folder)
+      print(f"Recycle bin: {folder}")
+    except Exception as error:
+      print(f"Could not recycle {folder} ({error})")
+
   print(
-      "\nProcessing completed successfully! The new chapter folders are safe"
-      " and untouched."
+      "\nProcessing completed successfully! The new chapter folders are in"
+      " the recycle bin if you need them back."
   )
 
 if __name__ == "__main__":
