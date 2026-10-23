@@ -3,6 +3,7 @@ import math
 import os
 import shutil
 import sys
+import unicodedata
 from pathlib import Path
 
 from prompt_toolkit import prompt  # pip install prompt_toolkit
@@ -59,20 +60,16 @@ def print_header(subtitle=""):
     print(f"{DIM}  {subtitle}{RESET}")
   print(f"{CYAN}{line}{RESET}\n")
 
-def print_author_grid(authors):
-  """Print the authors in neat columns, alphabetical left to right, top to bottom."""
-  term_width = shutil.get_terminal_size().columns
-  entries = [
-      (name, len(list_folders(MANGA_ROOT / name))) for name in authors
-  ]
+def group_key(name):
+  """Letter heading for an author: 'A'-'Z', or '#' for numbers and symbols."""
+  first = unicodedata.normalize("NFD", name[:1])[:1]  # strips accents (É -> E)
+  return first.upper() if first.isalpha() else "#"
 
-  labels = [f"{name} ({count})" for name, count in entries]
-  col_width = min(max(len(label) for label in labels) + 3, term_width - 4)
-  columns = max(1, (term_width - 2) // col_width)
+def print_rows(entries, columns, col_width):
+  """Print entries in rows, reading left to right."""
   rows = math.ceil(len(entries) / columns)
-
   for row in range(rows):
-    line = "  "
+    line = "    "  # indented under the letter heading
     for col in range(columns):
       index = row * columns + col
       if index >= len(entries):
@@ -86,6 +83,30 @@ def print_author_grid(authors):
       padding = " " * (col_width - len(label))
       line += f"{YELLOW}{name}{RESET} {DIM}({count}){RESET}{padding}"
     print(line.rstrip())
+
+def print_author_grid(authors):
+  """Print the authors under a letter heading (A, B, ...), indented below it.
+
+  Names starting with a number or symbol go together under '#'.
+  """
+  term_width = shutil.get_terminal_size().columns
+  entries = [
+      (name, len(list_folders(MANGA_ROOT / name))) for name in authors
+  ]
+
+  # One column width for every group so everything lines up
+  labels = [f"{name} ({count})" for name, count in entries]
+  col_width = min(max(len(label) for label in labels) + 3, term_width - 4)
+  columns = max(1, (term_width - 4) // col_width)
+
+  groups = {}
+  for entry in entries:
+    groups.setdefault(group_key(entry[0]), []).append(entry)
+
+  for key in sorted(groups, key=lambda k: (k != "#", k)):  # '#' first
+    print(f"  {BOLD}{CYAN}{key}{RESET}")
+    print_rows(groups[key], columns, col_width)
+    print()
 
 def show_main_menu(authors, error=""):
   """Draw the main menu: all authors plus the instructions."""
