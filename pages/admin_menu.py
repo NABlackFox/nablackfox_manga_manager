@@ -2,6 +2,7 @@
 from prompt_toolkit import prompt
 from prompt_toolkit.key_binding import KeyBindings
 from functions.convert_thumbnail import convert_thumbnails
+from functions.grab_zip_files import grab_zip_files
 
 from utils import (
     BOLD, DIM, YELLOW, RESET,
@@ -58,5 +59,4 @@ def run_admin_menu(manga_root):
             convert_thumbnails(manga_root)
 
         elif choice == "2":
-            print("\nGrab zip file is not implemented yet.")
-            input("Press Enter to return to the admin menu...")
+            grab_zip_files(manga_root)
