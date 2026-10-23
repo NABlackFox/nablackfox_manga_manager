@@ -1,7 +1,7 @@
 import re
 import shutil
 from send2trash import send2trash
-from utils import list_images, list_subfolders, natural_key
+from utils import list_images
 
 def build_merged_name(first_name, chapter_count):
   """Build output folder name from the first chapter's folder name."""

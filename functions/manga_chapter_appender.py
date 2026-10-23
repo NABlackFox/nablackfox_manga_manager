@@ -2,7 +2,6 @@ from collections import namedtuple
 import re
 import shutil
 from utils import list_images
-import functions.merge_manga as merge_manga
 
 MergedInfo = namedtuple(
     "MergedInfo", "all_images existing last_number existing_width ignored"
