@@ -11,7 +11,8 @@ from prompt_toolkit import prompt  # pip install prompt_toolkit
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.key_binding import KeyBindings
 
-import unzip_manga  # same folder as this file
+import merge_manga  # same folder as this file
+import unzip_manga
 
 # Mother folder: contains one folder per author, each holding the manga folders
 MANGA_ROOT = Path(r"C:\NABlackFoxDisk\Pic\noncheck")
@@ -282,6 +283,211 @@ def run_unzip(author):
   print()
   input(f"  {DIM}Press Enter to go back...{RESET}")
 
+def read_text(question):
+  """Read one line of text. Enter submits it; Esc cancels and returns None."""
+  kb = KeyBindings()
+
+  @kb.add("escape", eager=True)
+  def _cancel(event):
+    event.app.exit(result=None)
+
+  return prompt(question, key_bindings=kb)
+
+def parse_selection(text, count):
+  """Turn '2', '1 3 5' or '4-7' into a list of numbers (ValueError if invalid)."""
+  numbers = []
+  for token in re.split(r"[,\s]+", text.strip()):
+    if not token:
+      continue
+    match = re.fullmatch(r"(\d+)(?:-(\d+))?", token)
+    if not match:
+      raise ValueError(f'"{token}" is not a number from the list.')
+    start = int(match.group(1))
+    end = int(match.group(2) or start)
+    if start > end:
+      raise ValueError(f'"{token}" is not a valid range.')
+    if start < 1 or end > count:
+      raise ValueError(f"{token} is out of range (the list has 1-{count}).")
+    numbers.extend(range(start, end + 1))
+  return numbers
+
+def show_merge_screen(author, folders, chosen, error=""):
+  """Numbered folder list, the order picked so far, and the instructions."""
+  clear_screen()
+  print_header(f"Library: {MANGA_ROOT}")
+  print(f"  {BOLD}Merge manga{RESET} {DIM}-{RESET} {GREEN}{author}{RESET}\n")
+
+  digits = len(str(len(folders)))
+  for number, folder in enumerate(folders, start=1):
+    if folder in chosen:
+      print(f"  {DIM}{number:>{digits}}  {folder.name}{RESET}")
+    else:
+      print(f"  {YELLOW}{number:>{digits}}{RESET}  {CYAN}{folder.name}{RESET}")
+  print()
+
+  if chosen:
+    print(f"  {BOLD}Merge order so far{RESET}\n")
+    for folder in chosen:
+      print(f"  {folder.name}")
+    print()
+
+  print(
+      f"  {DIM}Enter the number of each folder in the order it should be merged"
+      f" (e.g. 3, or 1 4 2, or 5-9).{RESET}"
+  )
+  print(
+      f"  {DIM}Press Enter on an empty line when you are done."
+      f"  Esc to cancel.{RESET}\n"
+  )
+  if error:
+    print(f"  {RED}{error}{RESET}\n")
+
+def ask_merge_order(author, folders):
+  """Ask for the folders by number, in merge order. None means cancelled."""
+  chosen = []
+  error = ""
+  while True:
+    show_merge_screen(author, folders, chosen, error)
+    error = ""
+    text = read_text(f"  Folder {len(chosen) + 1} > ")
+    if text is None:
+      return None
+
+    if not text.strip():
+      if not chosen:
+        error = "Pick at least one folder first."
+        continue
+      return chosen
+
+    try:
+      numbers = parse_selection(text, len(folders))
+    except ValueError as exc:
+      error = str(exc)
+      continue
+
+    already = []
+    for number in numbers:
+      folder = folders[number - 1]
+      if folder in chosen:
+        already.append(str(number))
+      else:
+        chosen.append(folder)
+    if already:
+      error = f"Already added, skipped: {', '.join(already)}"
+
+def merge_message_screen(author, lines):
+  """Show a short message under the Merge title and wait for Enter."""
+  clear_screen()
+  print_header(f"Library: {MANGA_ROOT}")
+  print(f"  {BOLD}Merge manga{RESET} {DIM}-{RESET} {GREEN}{author}{RESET}\n")
+  for line in lines:
+    print(f"  {line}")
+  print()
+  input(f"  {DIM}Press Enter to go back...{RESET}")
+
+def run_merge(author):
+  """Function 2: merge chosen chapter folders into one numbered folder."""
+  author_folder = MANGA_ROOT / author
+  folders = merge_manga.list_subfolders(author_folder)
+  if not folders:
+    merge_message_screen(author, ["No folders to merge in this author folder."])
+    return
+
+  # 1. Pick the folders by number, in merge order
+  chosen = ask_merge_order(author, folders)
+  if chosen is None:
+    return
+
+  # 2. Work out what will happen
+  plan = merge_manga.build_plan(chosen)
+  merged_name = (
+      merge_manga.build_merged_name(chosen[0].name, len(chosen))
+      or "merged_output"
+  )
+  output_folder = author_folder / merged_name
+
+  if not plan:
+    merge_message_screen(
+        author, [f"{RED}No image files found in the selected folders.{RESET}"]
+    )
+    return
+  if any(merge_manga.is_inside(output_folder, f) for f in chosen):
+    merge_message_screen(
+        author,
+        [
+            f"{RED}The output folder name matches one of the selected"
+            f" folders:{RESET}",
+            merged_name,
+        ],
+    )
+    return
+
+  # 3. Show the result and ask to continue
+  pages = {}
+  for _file, label in plan:
+    pages[label] = pages.get(label, 0) + 1
+
+  clear_screen()
+  print_header(f"Library: {MANGA_ROOT}")
+  print(f"  {BOLD}Merge manga{RESET} {DIM}-{RESET} {GREEN}{author}{RESET}\n")
+  print(f"  {BOLD}Merge order{RESET}\n")
+  for folder in chosen:
+    count = pages.get(folder.name, 0)
+    print(f"  {CYAN}{folder.name}{RESET} {DIM}({count} pages){RESET}")
+  print(f"\n  {BOLD}Output folder{RESET}\n")
+  print(f"  {GREEN}{merged_name}{RESET}\n")
+  print(
+      f"  {len(plan)} pages in total. After merging, the {len(chosen)} source"
+      " folder(s)\n  are moved to the recycle bin."
+  )
+  if output_folder.exists() and any(output_folder.iterdir()):
+    print(
+        f"\n  {RED}The output folder already exists and is not empty."
+        f" Files with the same names will be overwritten.{RESET}"
+    )
+  print()
+
+  if not read_confirm("  Continue? (y/n) "):
+    print("\n  Cancelled. Nothing was changed.\n")
+    input(f"  {DIM}Press Enter to go back...{RESET}")
+    return
+
+  # 4. Copy the pages
+  print()
+  try:
+    for number, total in merge_manga.copy_pages(plan, output_folder):
+      print(f"\r  Copying pages... {number}/{total}", end="", flush=True)
+    print()
+  except Exception as error:
+    print(f"\n\n  {RED}Copy failed: {error}{RESET}")
+    print("  The source folders were NOT touched.\n")
+    input(f"  {DIM}Press Enter to go back...{RESET}")
+    return
+
+  # 5. Only after every page was copied, send the source folders to the bin
+  copied = len(merge_manga.list_images(output_folder))
+  if copied < len(plan):
+    print(
+        f"\n  {RED}Warning: expected at least {len(plan)} images in the"
+        f" output folder but found {copied}.{RESET}"
+    )
+    print("  The source folders were NOT touched.\n")
+    input(f"  {DIM}Press Enter to go back...{RESET}")
+    return
+
+  print()
+  for folder, error in merge_manga.recycle_folders(chosen):
+    if error is None:
+      print(f"  {GREEN}OK{RESET}      {folder.name}")
+    else:
+      print(f"  {RED}FAILED{RESET}  {folder.name} ({error})")
+  print(
+      f"\n  {GREEN}Done!{RESET} {len(plan)} pages merged. The source folders"
+      " are in the recycle bin\n  if you need them back."
+  )
+  print()
+  input(f"  {DIM}Press Enter to go back...{RESET}")
+
 def author_menu(author):
   """Author screen: folder overview, the three functions, Esc to go back."""
   message = ""
@@ -304,8 +510,8 @@ def author_menu(author):
     choice = read_choice()
     if choice == "esc":
       return
-    if choice == "1":
-      run_unzip(author)
+    if choice in ("1", "2"):
+      (run_unzip if choice == "1" else run_merge)(author)
       message = ""
       continue
     message =f"Function chosen: {FUNCTIONS[choice]} (not connected yet)"
