@@ -1,39 +1,27 @@
-from pathlib import Path, PurePosixPath
-import re
+from pathlib import PurePosixPath
 import shutil
 import zipfile
+from utils import natural_key
 
 META_FILE_NAME = "meta.json"
 
-def natural_key(path):
-  """Sort key that orders names by the numbers inside them (2 before 10)."""
-  return [
-      int(part) if part.isdigit() else part.lower()
-      for part in re.split(r"(\d+)", path.name)
-  ]
-
 def list_zips(folder):
   """Return the zip files in a folder, sorted by the number in the name."""
-  zips = [f for f in folder.iterdir() if f.is_file() and f.suffix.lower() == ".zip"]
+  try:
+    zips = [f for f in folder.iterdir() if f.is_file() and f.suffix.lower() == ".zip"]
+  except OSError:
+    return []
   zips.sort(key=natural_key)
   return zips
 
 def find_new_zips(folder):
-  """Return (zips still to unzip, number already unzipped).
-
-  A zip counts as already unzipped when a folder with its name exists.
-  """
+  """Return (zips still to unzip, number already unzipped)."""
   zips = list_zips(folder)
   to_unzip = [z for z in zips if not (folder / z.stem).exists()]
   return to_unzip, len(zips) - len(to_unzip)
 
 def extract_flat(zf, output_folder):
-  """Extract an open zip into output_folder.
-
-  If everything in the zip sits inside one single wrapper folder (what you get
-  when a manga folder itself was zipped), that wrapper is skipped, so the
-  pages land directly in output_folder instead of output_folder/<same name>/.
-  """
+  """Extract an open zip into output_folder."""
   infos = [i for i in zf.infolist() if i.filename.strip("/")]
   all_parts = [PurePosixPath(i.filename).parts for i in infos]
 
@@ -51,7 +39,7 @@ def extract_flat(zf, output_folder):
   for info, parts in zip(infos, all_parts):
     parts = parts[skip:]
     if not parts:
-      continue  # the wrapper folder entry itself
+      continue
     target = output_folder.joinpath(*parts)
     if info.is_dir():
       target.mkdir(parents=True, exist_ok=True)
@@ -61,11 +49,7 @@ def extract_flat(zf, output_folder):
       shutil.copyfileobj(source, destination)
 
 def unzip_one(zip_file, output_folder):
-  """Unzip one zip into its own folder, delete meta.json, then delete the zip.
-
-  If extraction fails (or is interrupted with Ctrl+C), the half-extracted
-  folder is removed and the zip is kept, so it is picked up again next time.
-  """
+  """Unzip one zip into its own folder, delete meta.json, then delete the zip."""
   try:
     with zipfile.ZipFile(zip_file) as zf:
       extract_flat(zf, output_folder)
@@ -73,16 +57,10 @@ def unzip_one(zip_file, output_folder):
   except BaseException:
     shutil.rmtree(output_folder, ignore_errors=True)
     raise
-
-  # Only reached when the extraction fully succeeded
   zip_file.unlink()
 
 def unzip_zips(folder, zips):
-  """Unzip each zip into its own folder inside `folder`, one by one.
-
-  Yields (number, zip_file, error) after every zip, so the caller can show
-  progress. `error` is None on success, or the exception on failure.
-  """
+  """Unzip each zip into its own folder inside `folder`, one by one."""
   for number, zip_file in enumerate(zips, start=1):
     try:
       unzip_one(zip_file, folder / zip_file.stem)
