@@ -119,3 +119,21 @@ def parse_selection(text, count):
       raise ValueError(f"{token} is out of range (the list has 1-{count}).")
     numbers.extend(range(start, end + 1))
   return numbers
+
+# A merged page is "001.png" or, for the first page of a chapter, "001-chapter2.png"
+PAGE_RE = re.compile(r"^(\d+)(?:-chapter(\d+))?$", re.IGNORECASE)
+
+
+def parse_page(file):
+  """Return (page number, chapter number or None) for a merged page, else None."""
+  match = PAGE_RE.match(file.stem)
+  if not match:
+    return None
+  chapter = int(match.group(2)) if match.group(2) else None
+  return int(match.group(1)), chapter
+
+
+def page_name(number, width, suffix, chapter=None):
+  """Build a page file name, e.g. 007.png or 007-chapter2.png."""
+  marker = f"-chapter{chapter}" if chapter else ""
+  return f"{number:0{width}d}{marker}{suffix}"

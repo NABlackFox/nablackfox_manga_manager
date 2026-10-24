@@ -66,6 +66,7 @@ def run_append(author, manga_root):
     return
 
   info = manga_chapter_appender.scan_merged_folder(merged_folder)
+  first_chapter = manga_chapter_appender.chapter_count(merged_folder, info) + 1
   plan = merge_manga.build_plan(chosen)
   if not plan:
     merge_message_screen(
@@ -136,7 +137,7 @@ def run_append(author, manga_root):
     if needs_repad:
       manga_chapter_appender.repad_existing(info, width)
     for number, total in manga_chapter_appender.copy_pages(
-        plan, merged_folder, first_new, width
+        plan, merged_folder, first_new, width, first_chapter
     ):
       print(f"\r  Copying pages... {number}/{total}", end="", flush=True)
     print()

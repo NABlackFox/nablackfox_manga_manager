@@ -9,12 +9,13 @@ from utils import (
 from pages.unzip_page import run_unzip
 from pages.merge_page import run_merge
 from pages.append_page import run_append
+from pages.marker_page import run_markers
 
 FUNCTIONS = {
     "1": "Unzip manga",
     "2": "Merge manga",
     "3": "Append chapters",
-    "4": "Refresh",
+    "4": "Edit chapter marker",
 }
 
 def list_folders_sorted(parent):
@@ -128,6 +129,9 @@ def read_choice():
   @kb.add("escape", eager=True)
   def _back(event):
     event.app.exit(result="esc")
+  @kb.add("c-r", eager=True)
+  def _refresh(event):
+    event.app.exit(result="refresh")
   return prompt("  > ", key_bindings=kb)
 
 def run_author_menu(author, manga_root):
@@ -143,7 +147,7 @@ def run_author_menu(author, manga_root):
     print(f"  {BOLD}Functions{RESET}\n")
     for key, name in FUNCTIONS.items():
       print(f"  {YELLOW}{key}{RESET}  {name}")
-    print(f"\n  {DIM}Press 1-{len(FUNCTIONS)} to choose, Esc to go back, Ctrl+C to exit.{RESET}\n")
+    print(f"\n  {DIM}Press 1-{len(FUNCTIONS)} to choose, Ctrl+R to refresh, Esc to go back, Ctrl+C to exit.{RESET}\n")
     if message:
       print(f"  {GREEN}{message}{RESET}\n")
 
@@ -157,6 +161,7 @@ def run_author_menu(author, manga_root):
         "1": lambda a: run_unzip(a, manga_root),
         "2": lambda a: run_merge(a, manga_root),
         "3": lambda a: run_append(a, manga_root),
+        "4": lambda a: run_markers(a, manga_root),
     }
     if choice in runners:
       runners[choice](author)

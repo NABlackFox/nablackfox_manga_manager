@@ -1,7 +1,7 @@
 from collections import namedtuple
 import re
 import shutil
-from utils import list_images
+from utils import list_images, parse_page, page_name
 
 MergedInfo = namedtuple(
     "MergedInfo", "all_images existing last_number existing_width ignored"
@@ -10,11 +10,15 @@ MergedInfo = namedtuple(
 def scan_merged_folder(folder):
   """Read the numbered pages of an already merged folder."""
   all_images = list_images(folder)
-  existing = [(int(f.stem), f) for f in all_images if f.stem.isdigit()]
+  existing = []
+  for f in all_images:
+    parsed = parse_page(f)
+    if parsed:
+      existing.append((parsed[0], f))
 
   if existing:
     last_number = max(number for number, _ in existing)
-    existing_width = max(len(f.stem) for _, f in existing)
+    existing_width = max(len(re.match(r"\d+", f.stem).group()) for _, f in existing)
   else:
     last_number = 0
     existing_width = 3
@@ -44,7 +48,8 @@ def repad_existing(info, width):
   done = []
   try:
     for number, file in info.existing:
-      target = file.with_name(f"{number:0{width}d}{file.suffix}")
+      chapter = parse_page(file)[1]
+      target = file.with_name(page_name(number, width, file.suffix, chapter))
       file.rename(target)
       done.append((target, file))
   except BaseException:
@@ -55,8 +60,26 @@ def repad_existing(info, width):
         pass
     raise
 
-def copy_pages(plan, merged_folder, first_new, width):
-  """Copy new pages into the merged folder continuing from first_new."""
-  for number, (file, _label) in enumerate(plan, start=first_new):
-    shutil.copy2(file, merged_folder / f"{number:0{width}d}{file.suffix}")
+def chapter_count(merged_folder, info):
+  """How many chapters the merged folder holds so far."""
+  match = re.search(r"Chapters\s+1-(\d+)\s*$", merged_folder.name)
+  if match:
+    return int(match.group(1))
+  chapters = [parse_page(f)[1] for _, f in info.existing]
+  return max((c for c in chapters if c), default=0)
+
+def copy_pages(plan, merged_folder, first_new, width, first_chapter):
+  """Copy new pages into the merged folder continuing from first_new.
+
+  The first page of every new chapter is named like 031-chapter3.png.
+  """
+  chapter = first_chapter - 1
+  last_label = None
+  for number, (file, label) in enumerate(plan, start=first_new):
+    marker = None
+    if label != last_label:
+      chapter += 1
+      marker = chapter
+      last_label = label
+    shutil.copy2(file, merged_folder / page_name(number, width, file.suffix, marker))
     yield number - first_new + 1, len(plan)
