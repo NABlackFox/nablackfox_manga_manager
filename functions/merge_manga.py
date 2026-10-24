@@ -2,6 +2,7 @@ import re
 import shutil
 from send2trash import send2trash
 from utils import list_images, page_name
+from helpers.chapter_ranges import mark_new_pages
 
 def build_merged_name(first_name, chapter_count):
   """Build output folder name from the first chapter's folder name."""
@@ -34,15 +35,9 @@ def copy_pages(plan, output_folder):
   """
   width = max(3, len(str(len(plan))))
   output_folder.mkdir(parents=True, exist_ok=True)
-  chapter = 0
-  last_label = None
-  for number, (file, label) in enumerate(plan, start=1):
-    marker = None
-    if label != last_label:
-      chapter += 1
-      marker = chapter
-      last_label = label
-    shutil.copy2(file, output_folder / page_name(number, width, file.suffix, marker))
+  marked = mark_new_pages(plan, 1)
+  for number, (file, chapter) in enumerate(marked, start=1):
+    shutil.copy2(file, output_folder / page_name(number, width, file.suffix, chapter))
     yield number, len(plan)
 
 def recycle_folders(folders):

@@ -1,22 +1,6 @@
-from prompt_toolkit import prompt
-from prompt_toolkit.key_binding import KeyBindings
-from utils import BOLD, CYAN, DIM, GREEN, RED, RESET, clear_screen, print_header
+from utils import BOLD, DIM, GREEN, RED, RESET, clear_screen, print_header
+from helpers.prompts import read_confirm, pause
 import functions.unzip_manga as unzip_manga
-
-def read_confirm(question):
-  kb = KeyBindings()
-  @kb.add("<any>")
-  def _ignore(event):
-    pass
-  for key in ("y", "Y"):
-    @kb.add(key, eager=True)
-    def _yes(event):
-      event.app.exit(result=True)
-  for key in ("n", "N", "escape"):
-    @kb.add(key, eager=True)
-    def _no(event):
-      event.app.exit(result=False)
-  return prompt(question, key_bindings=kb)
 
 def ask_continue(zips):
   print(f"  {BOLD}Ready to unzip{RESET}\n")
@@ -41,7 +25,7 @@ def run_unzip(author, manga_root):
   if not to_unzip:
     print("  Nothing to unzip.")
   elif not ask_continue(to_unzip):
-    print(f"\n  Cancelled. Nothing was changed.")
+    print("\n  Cancelled. Nothing was changed.")
   else:
     print()
     failed = []
@@ -62,4 +46,4 @@ def run_unzip(author, manga_root):
       print(f"\n  {GREEN}Done!{RESET} {len(to_unzip)} zip(s) unzipped and deleted.")
 
   print()
-  input(f"  {DIM}Press Enter to go back...{RESET}")
+  pause()
