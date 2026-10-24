@@ -1,27 +1,4 @@
-import re
-from utils import PAGE_RE, list_images, parse_page
-
-def merged_chapter_count(folder):
-  """Return X for a folder named '... Chapters 1-X', else None."""
-  match = re.search(r"Chapters\s+1-(\d+)\s*$", folder.name)
-  return int(match.group(1)) if match else None
-
-def list_merged_folders(folders):
-  return [f for f in folders if merged_chapter_count(f)]
-
-def read_pages(folder):
-  """Return ({page number: [files]}, {chapter: [(page number, file)]})."""
-  pages = {}
-  markers = {}
-  for file in list_images(folder):
-    parsed = parse_page(file)
-    if not parsed:
-      continue
-    number, chapter = parsed
-    pages.setdefault(number, []).append(file)
-    if chapter:
-      markers.setdefault(chapter, []).append((number, file))
-  return pages, markers
+from utils import PAGE_RE, parse_page
 
 def with_marker(file, chapter):
   """File path with the chapter marker set (or removed when chapter is None)."""

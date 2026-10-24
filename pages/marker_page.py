@@ -1,47 +1,19 @@
 from utils import (
-    BOLD, CYAN, DIM, GREEN, RED, YELLOW, RESET,
-    clear_screen, print_header, print_title, list_subfolders
+    BOLD, CYAN, RED, RESET, list_subfolders
 )
 import functions.chapter_marker as chapter_marker
-from pages.merge_page import merge_message_screen, read_text, read_confirm
-from pages.append_page import ask_single_folder, pause
+import helpers.merged_folder as merged_folder
+from helpers.prompts import (
+    ask_single_folder, ask_number, message_screen, read_confirm, pause
+)
+from helpers.screens import show_chapters
 
 TITLE = "Edit chapter marker"
 
-def show_chapters(author, folder, count, markers, manga_root, prompt_text, error=""):
-  clear_screen()
-  print_header(manga_root, f"Library: {manga_root}")
-  print_title(TITLE, author)
-  print(f"  {GREEN}{folder.name}{RESET}\n")
-  digits = len(str(count))
-  for chapter in range(1, count + 1):
-    entries = markers.get(chapter)
-    if entries:
-      number, file = entries[0]
-      print(f"  {YELLOW}{chapter:>{digits}}{RESET}  starts at page {number}  {DIM}({file.name}){RESET}")
-    else:
-      print(f"  {YELLOW}{chapter:>{digits}}{RESET}  {DIM}no marker{RESET}")
-  print(f"\n  {DIM}{prompt_text}  Esc to go back.{RESET}\n")
-  if error:
-    print(f"  {RED}{error}{RESET}\n")
-
-def ask_number(question, show, parse):
-  """Ask until `parse` accepts the text; None when cancelled with Esc."""
-  error = ""
-  while True:
-    show(error)
-    text = read_text(question)
-    if text is None:
-      return None
-    try:
-      return parse(text.strip())
-    except ValueError as exc:
-      error = str(exc)
-
 def run_markers(author, manga_root):
-  folders = chapter_marker.list_merged_folders(list_subfolders(manga_root / author))
+  folders = merged_folder.list_merged_folders(list_subfolders(manga_root / author))
   if not folders:
-    merge_message_screen(
+    message_screen(
         author, ["No merged folder (name ending in 'Chapters 1-X') found."],
         manga_root, TITLE,
     )
@@ -53,10 +25,10 @@ def run_markers(author, manga_root):
   )
   if folder is None:
     return
-  count = chapter_marker.merged_chapter_count(folder)
+  count = merged_folder.merged_chapter_count(folder)
 
   while True:
-    pages, markers = chapter_marker.read_pages(folder)
+    pages, markers = merged_folder.read_pages(folder)
 
     def parse_chapter(text):
       if not text.isdigit() or not 1 <= int(text) <= count:
@@ -66,7 +38,7 @@ def run_markers(author, manga_root):
     chapter = ask_number(
         "  Chapter > ",
         lambda err: show_chapters(
-            author, folder, count, markers, manga_root,
+            author, folder, count, markers, manga_root, TITLE,
             "Enter the chapter whose marker you want to change.", err),
         parse_chapter,
     )
@@ -83,7 +55,7 @@ def run_markers(author, manga_root):
     start = ask_number(
         "  Start page > ",
         lambda err: show_chapters(
-            author, folder, count, markers, manga_root,
+            author, folder, count, markers, manga_root, TITLE,
             f"Chapter {chapter}: enter the page number where it now starts.", err),
         parse_start,
     )
@@ -92,7 +64,7 @@ def run_markers(author, manga_root):
 
     renames = chapter_marker.plan_marker(chapter, start, pages, markers)
     if not renames:
-      merge_message_screen(
+      message_screen(
           author, [f"Chapter {chapter} already starts at page {start}. Nothing to change."],
           manga_root, TITLE,
       )
