@@ -1,20 +1,20 @@
 import math
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import WordCompleter
-from prompt_toolkit.key_binding import KeyBindings
 from utils import (
     BOLD, CYAN, DIM, GREEN, RED, YELLOW, RESET,
     clear_screen, print_header, group_key, natural_key
 )
+from helpers.prompts import read_menu_choice
 from pages.unzip_page import run_unzip
 from pages.merge_page import run_merge
-from pages.append_page import run_append
+from pages.edit_merged_menu import run_edit_merged_menu
 from pages.marker_page import run_markers
 
 FUNCTIONS = {
     "1": "Unzip manga",
     "2": "Merge manga",
-    "3": "Append chapters",
+    "3": "Edit Merged Chapters",
     "4": "Edit chapter marker",
 }
 
@@ -117,23 +117,6 @@ def ask_for_author(manga_root):
       return lookup[text.lower()]
     error = f'No author folder named "{text}". Try again.'
 
-def read_choice():
-  kb = KeyBindings()
-  @kb.add("<any>")
-  def _ignore(event):
-    pass
-  for key in FUNCTIONS:
-    @kb.add(key, eager=True)
-    def _pick(event, key=key):
-      event.app.exit(result=key)
-  @kb.add("escape", eager=True)
-  def _back(event):
-    event.app.exit(result="esc")
-  @kb.add("c-r", eager=True)
-  def _refresh(event):
-    event.app.exit(result="refresh")
-  return prompt("  > ", key_bindings=kb)
-
 def run_author_menu(author, manga_root):
   message = ""
   while True:
@@ -151,7 +134,7 @@ def run_author_menu(author, manga_root):
     if message:
       print(f"  {GREEN}{message}{RESET}\n")
 
-    choice = read_choice()
+    choice = read_menu_choice(FUNCTIONS, refresh=True)
     if choice == "esc":
       return
     if not (manga_root / author).is_dir():
@@ -160,7 +143,7 @@ def run_author_menu(author, manga_root):
     runners = {
         "1": lambda a: run_unzip(a, manga_root),
         "2": lambda a: run_merge(a, manga_root),
-        "3": lambda a: run_append(a, manga_root),
+        "3": lambda a: run_edit_merged_menu(a, manga_root),
         "4": lambda a: run_markers(a, manga_root),
     }
     if choice in runners:

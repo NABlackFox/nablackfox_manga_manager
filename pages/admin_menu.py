@@ -1,6 +1,4 @@
-
-from prompt_toolkit import prompt
-from prompt_toolkit.key_binding import KeyBindings
+from helpers.prompts import read_menu_choice
 from functions.convert_thumbnail import convert_thumbnails
 from functions.grab_zip_files import grab_zip_files
 
@@ -14,25 +12,6 @@ FUNCTIONS = {
     "1": "Grab zip file",
     "2": "Convert thumbnail",
 }
-
-
-def read_admin_choice():
-    kb = KeyBindings()
-
-    @kb.add("<any>")
-    def _ignore(event):
-        pass
-
-    for key in FUNCTIONS:
-        @kb.add(key, eager=True)
-        def _pick(event, key=key):
-            event.app.exit(result=key)
-
-    @kb.add("escape", eager=True)
-    def _back(event):
-        event.app.exit(result="esc")
-
-    return prompt("  > ", key_bindings=kb)
 
 
 def run_admin_menu(manga_root):
@@ -50,7 +29,7 @@ def run_admin_menu(manga_root):
             f"Esc to return, Ctrl+C to exit.{RESET}\n"
         )
 
-        choice = read_admin_choice()
+        choice = read_menu_choice(FUNCTIONS)
 
         if choice == "esc":
             return
