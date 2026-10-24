@@ -1,14 +1,14 @@
 import os
-from dotenv import load_dotenv
 import re
 import shutil
 from collections import defaultdict
 from pathlib import Path
 
+from dotenv import load_dotenv
 from utils import GREEN, YELLOW, RED, DIM, RESET
 
 
-# TODO: Change this to the folder where your downloaded ZIP files are stored.
+# Load local configuration from the project root.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(PROJECT_ROOT / ".env")
 
@@ -16,39 +16,27 @@ ZIP_SOURCE_FOLDER = Path(
     os.getenv("ZIP_SOURCE_FOLDER", str(Path.home() / "Downloads"))
 ).expanduser()
 
+
 def normalize_name(name):
     """Normalize text for case-insensitive, punctuation-tolerant matching."""
     return " ".join(re.findall(r"[a-z0-9]+", name.casefold()))
 
-def extract_author_text(filename):
-    """
-    Extract the first bracket group after the nhentai ID.
-
-    Example:
-    nhentai-516648 - [Gasoline Chahan (Edogawa Nitro King)] ...
-    -> Gasoline Chahan (Edogawa Nitro King)
-    """
-    match = re.match(
-        r"^nhentai-\d+\s*-\s*\[([^\]]+)\]",
-        filename,
-        flags=re.IGNORECASE,
-    )
-
-    if not match:
-        return None
-
-    return match.group(1)
 
 def extract_author_candidates(filename):
     """
-    Extract author candidates from the first bracket group.
+    Extract author candidates from the first author bracket group.
 
-    [Fan no Hitori] -> ["Fan no Hitori"]
-    [Gasoline Chahan (Edogawa Nitro King)]
-        -> ["Gasoline Chahan", "Edogawa Nitro King"]
+    Handles:
+        nhentai-325605 - (C94) [micro page (Kuromotokun)] ...
+        nhentai-430708 - [micro page (Kuromotokun)] ...
+        nhentai-516648 - [Gasoline Chahan (Edogawa Nitro King)] ...
+
+    Returns:
+        ["micro page", "Kuromotokun"]
+        ["Gasoline Chahan", "Edogawa Nitro King"]
     """
     match = re.match(
-        r"^nhentai-\d+\s*-\s*\[([^\]]+)\]",
+        r"^nhentai-\d+\s*-\s*(?:\([^)]*\)\s*)*\[([^\]]+)\]",
         filename,
         flags=re.IGNORECASE,
     )
@@ -57,9 +45,6 @@ def extract_author_candidates(filename):
         return []
 
     group = match.group(1).strip()
-
-    # If parentheses exist, try A first, then B.
-    # Otherwise, the whole group is the only candidate.
     parenthesized = re.search(r"\(([^()]*)\)", group)
 
     if parenthesized:
@@ -67,19 +52,20 @@ def extract_author_candidates(filename):
         candidate_b = parenthesized.group(1).strip()
 
         return [
-            candidate for candidate in (candidate_a, candidate_b)
+            candidate
+            for candidate in (candidate_a, candidate_b)
             if candidate
         ]
 
     return [group]
 
+
 def find_matching_author(filename, author_folders):
-    """Check candidate A first, then candidate B using safe prefix matching."""
+    """Match candidate A exactly, then candidate B by whole-word prefix."""
     candidates = extract_author_candidates(filename)
 
     for index, candidate in enumerate(candidates):
         normalized_candidate = normalize_name(candidate)
-
         matching_folders = []
 
         for folder in author_folders:
@@ -89,21 +75,19 @@ def find_matching_author(filename, author_folders):
                 continue
 
             if index == 0:
-                # Candidate A: require an exact match.
                 matches = normalized_candidate == normalized_folder
             else:
-                # Candidate B: folder name must be the beginning
-                # of the candidate, followed by a word boundary.
                 matches = (
                     normalized_candidate == normalized_folder
-                    or normalized_candidate.startswith(normalized_folder + " ")
+                    or normalized_candidate.startswith(
+                        normalized_folder + " "
+                    )
                 )
 
             if matches:
                 matching_folders.append(folder)
 
         if matching_folders:
-            # If multiple folders match, prefer the longest folder name.
             return max(
                 matching_folders,
                 key=lambda folder: len(normalize_name(folder.name)),
@@ -111,17 +95,17 @@ def find_matching_author(filename, author_folders):
 
     return None
 
-def prompt_create_missing_author_folders(unmatched, manga_root):
-    """Offer to create folders for unique unmatched authors."""
 
+def prompt_create_missing_author_folders(unmatched, manga_root):
+    """Offer to create folders for unmatched authors without moving ZIPs."""
     groups = {}
 
-    # Only offer folder creation for missing authors, not file conflicts.
     for zip_file, reason in unmatched:
         if reason != "no matching author":
             continue
 
         candidates = extract_author_candidates(zip_file.name)
+
         if not candidates:
             continue
 
@@ -186,14 +170,15 @@ def prompt_create_missing_author_folders(unmatched, manga_root):
                 folder_name = candidates[1]
 
             elif choice == "3":
-                # Keep asking for a custom name until it is valid.
                 while True:
                     folder_name = input(
                         "Enter custom folder name: "
                     ).strip()
 
                     if not folder_name:
-                        print(f"{RED}Folder name cannot be empty.{RESET}")
+                        print(
+                            f"{RED}Folder name cannot be empty.{RESET}"
+                        )
                         continue
 
                     normalized_custom = normalize_name(folder_name)
@@ -255,7 +240,10 @@ def prompt_create_missing_author_folders(unmatched, manga_root):
                 created_count += 1
 
             except OSError as exc:
-                print(f"{RED}[FAILED] Could not create folder: {exc}{RESET}")
+                print(
+                    f"{RED}[FAILED] Could not create folder: "
+                    f"{exc}{RESET}"
+                )
 
             break
 
@@ -263,14 +251,15 @@ def prompt_create_missing_author_folders(unmatched, manga_root):
         print(f"\n{GREEN}{'=' * 45}{RESET}")
         print(f"{GREEN}Created {created_count} author folder(s).{RESET}")
         print(
-            f"{YELLOW}NEXT STEP: Return to the Admin menu "
-            f"and select Option 2 - Grab zip file again.{RESET}"
+            f"{YELLOW}NEXT STEP: Run Grab ZIP File again "
+            f"from the Admin menu.{RESET}"
         )
         print(
             f"{DIM}The ZIPs will be checked again and moved only "
-            f"if they match. Nothing else will move automatically.{RESET}"
+            f"if they match. Nothing moves automatically.{RESET}"
         )
         print(f"{GREEN}{'=' * 45}{RESET}")
+
 
 def grab_zip_files(manga_root):
     manga_root = Path(manga_root)
@@ -280,6 +269,14 @@ def grab_zip_files(manga_root):
         print(
             f"{RED}Download folder does not exist or is not accessible:"
             f"\n{source_folder}{RESET}"
+        )
+        input("\nPress Enter to return to the admin menu...")
+        return
+
+    if not manga_root.is_dir():
+        print(
+            f"{RED}Manga library folder does not exist or is not "
+            f"accessible:\n{manga_root}{RESET}"
         )
         input("\nPress Enter to return to the admin menu...")
         return
@@ -304,31 +301,36 @@ def grab_zip_files(manga_root):
         input("\nPress Enter to return to the admin menu...")
         return
 
-    # Matched files are grouped by the actual existing author folder.
     matched = defaultdict(list)
     unmatched = []
 
     for zip_file in sorted(zip_files, key=lambda p: p.name.casefold()):
-        author_folder = find_matching_author(zip_file.name, author_folders)
+        author_folder = find_matching_author(
+            zip_file.name,
+            author_folders,
+        )
 
         if author_folder is None:
             unmatched.append((zip_file, "no matching author"))
             continue
+
         destination = author_folder / zip_file.name
 
-        # Never overwrite an existing file.
         if destination.exists():
-            unmatched.append((zip_file, "destination file already exists"))
+            unmatched.append(
+                (zip_file, "destination file already exists")
+            )
             continue
 
         matched[author_folder].append(zip_file)
 
-    # Preview the entire plan before moving anything.
+    # Preview the complete plan before moving anything.
     print(f"\n{GREEN}ZIP files found: {len(zip_files)}{RESET}")
     print(f"Download folder: {source_folder}\n")
 
     for author_folder in sorted(
-        matched, key=lambda folder: folder.name.casefold()
+        matched,
+        key=lambda folder: folder.name.casefold(),
     ):
         print(f"{GREEN}{author_folder.name}:{RESET}")
 
@@ -357,12 +359,13 @@ def grab_zip_files(manga_root):
 
     if total_matched == 0:
         print(f"\n{YELLOW}Nothing can be moved safely.{RESET}")
-        # Still offer to create folders for unmatched new authors.
+
         prompt_create_missing_author_folders(unmatched, manga_root)
+
         input("\nPress Enter to return to the admin menu...")
         return
 
-    # One confirmation controls the entire operation.
+    # One confirmation controls the entire move operation.
     answer = input(
         f"\nMove these {total_matched} ZIP file(s) "
         "to their author folders? [y/N]: "
@@ -397,18 +400,23 @@ def grab_zip_files(manga_root):
                 )
                 moved += 1
 
-            except Exception as exc:
-                print(f"{RED}[FAILED] {zip_file.name}: {exc}{RESET}")
+            except (OSError, shutil.Error) as exc:
+                print(
+                    f"{RED}[FAILED] {zip_file.name}: {exc}{RESET}"
+                )
                 failed += 1
 
     print("\n" + "=" * 45)
     print("ZIP grabbing summary")
     print("=" * 45)
-    print(f"{GREEN}Moved:  {moved}{RESET}")
+    print(f"{GREEN}Moved: {moved}{RESET}")
     print(f"{RED}Failed: {failed}{RESET}")
-    print(f"{YELLOW}Left in download folder: "
-          f"{len(unmatched) + failed}{RESET}")
+    print(
+        f"{YELLOW}Left in download folder: "
+        f"{len(unmatched) + failed}{RESET}"
+    )
 
+    # Offer to create folders for unmatched authors.
     prompt_create_missing_author_folders(unmatched, manga_root)
 
     input("\nPress Enter to return to the admin menu...")
