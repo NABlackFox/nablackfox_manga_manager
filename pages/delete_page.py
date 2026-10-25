@@ -4,12 +4,26 @@ from utils import (
     list_images, parse_page, natural_key, parse_selection,
 )
 from helpers.prompts import (
-    ask_single_folder, read_text, read_confirm, message_screen, pause,
+    ask_single_folder, ask_merge_order, read_confirm, message_screen, pause,
 )
 import functions.delete_pages as delete_pages
 import helpers.merged_folder as merged_folder
 
 TITLE = "Delete pages"
+
+
+class PageRow:
+  """A page in the picker list: .name is what is shown."""
+
+  def __init__(self, number, name):
+    self.number = number
+    self.name = name
+
+  def __eq__(self, other):
+    return isinstance(other, PageRow) and self.number == other.number
+
+  def __hash__(self):
+    return hash(self.number)
 
 
 def run_delete_pages(author, manga_root):
@@ -29,65 +43,39 @@ def run_delete_pages(author, manga_root):
   if folder is None:
     return
 
-  error = ""
-  while True:
-    numbered = []
-    for file in list_images(folder):
-      parsed = parse_page(file)
-      if parsed:
-        numbered.append((parsed[0], file, parsed[1]))
-    numbered.sort(key=lambda item: (item[0], natural_key(item[1].name)))
+  numbered = []
+  for file in list_images(folder):
+    parsed = parse_page(file)
+    if parsed:
+      numbered.append((parsed[0], file, parsed[1]))
+  numbered.sort(key=lambda item: (item[0], natural_key(item[1].name)))
 
-    page_numbers = sorted({number for number, _file, _chapter in numbered})
-    if not page_numbers:
-      message_screen(author, ["No numbered page images remain in this folder."], manga_root, TITLE)
-      return
+  page_numbers = sorted({number for number, _file, _chapter in numbered})
+  if not page_numbers:
+    message_screen(author, ["No numbered page images remain in this folder."], manga_root, TITLE)
+    return
 
-    clear_screen()
-    print_header(manga_root, f"Library: {manga_root}")
-    print_title(TITLE, author)
-    print(f"  {GREEN}{folder.name}{RESET}\n")
-    print(f"  {BOLD}Pages (select the list numbers on the left){RESET}\n")
-
-    for index, page_number in enumerate(page_numbers, start=1):
-      files = [
-          file.name for number, file, _chapter in numbered
-          if number == page_number
-      ]
-      marker = next(
-          (
-              chapter for number, _file, chapter in numbered
-              if number == page_number and chapter
-          ),
-          None,
-      )
-      marker_text = f" {DIM}[chapter {marker} marker]{RESET}" if marker else ""
-      print(
-          f"  {YELLOW}{index:>3}{RESET}  Page {page_number}: "
-          f"{', '.join(files)}{marker_text}"
-      )
-
-    print(
-        f"\n  {DIM}Enter list numbers like 3, 8 9, or 2-5. "
-        "You can combine them with commas. Esc to cancel.{RESET}\n"
+  # One row per page number, shown with the same picker the merge screen uses.
+  rows = []
+  for page_number in page_numbers:
+    files = [f.name for number, f, _c in numbered if number == page_number]
+    marker = next(
+        (c for number, _f, c in numbered if number == page_number and c),
+        None,
     )
-    if error:
-      print(f"  {RED}{error}{RESET}\n")
-      error = ""
+    label = f"Page {page_number}: {', '.join(files)}"
+    if marker:
+      label += f"  [chapter {marker} marker]"
+    rows.append(PageRow(page_number, label))
 
-    text = read_text("  Pages to delete > ")
-    if text is None:
-      return
-
-    try:
-      indexes = parse_selection(text, len(page_numbers))
-      if not indexes:
-        raise ValueError("Select at least one page.")
-      selected = sorted({page_numbers[index - 1] for index in indexes})
-    except ValueError as exc:
-      error = str(exc)
-      continue
-    break
+  picked = ask_merge_order(
+      author, rows, manga_root, prompt_label="Page",
+      title=TITLE, verb="deleted", noun="page", ordered=False, chosen_label="Pages to delete",
+      note=f"Deleting from: {GREEN}{folder.name}{RESET}",
+  )
+  if picked is None:
+    return
+  selected = sorted({row.number for row in picked})
 
   print(f"\n  {RED}{BOLD}WARNING 1/3: PAGE DELETION{RESET}")
   print(f"  {RED}Selected page numbers: {', '.join(map(str, selected))}{RESET}")
