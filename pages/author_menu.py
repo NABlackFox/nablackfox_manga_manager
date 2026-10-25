@@ -92,7 +92,7 @@ def show_main_menu(authors, manga_root, error=""):
   print(f"  {BOLD}Authors{RESET} {DIM}({len(authors)}){RESET}\n")
   print_author_grid(authors, manga_root)
   print()
-  print(f"  {DIM}Type an author name (Tab to auto-complete).  Enter on an empty line to refresh.  Ctrl+C to exit.{RESET}\n")
+  print(f"  {DIM}Type an author name (Tab to auto-complete), or \"read\" for read mode.  Enter on an empty line to refresh.  Ctrl+C to exit.{RESET}\n")
   if error:
     print(f"  {RED}{error}{RESET}\n")
 
@@ -114,6 +114,8 @@ def ask_for_author(manga_root):
     # Open admin menu when the user types "admin"
     if text.casefold() == "admin":
       return "admin"
+    if text.casefold() == "read":
+      return "read"
 
     if text.lower() in lookup:
       return lookup[text.lower()]

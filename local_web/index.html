@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reader</title>
+<style>
+  :root {
+    --bg: #0e0e10;
+    --bar: rgba(20, 20, 23, 0.94);
+    --ink: #e8e6e1;
+    --dim: #8d8a84;
+    --line: #2a2a2e;
+    --accent: #e0a458;
+    --w: 800px;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); color: var(--ink); }
+  body {
+    margin: 0;
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--bg);
+  }
+
+  /* top bar */
+  #bar {
+    position: fixed; inset: 0 0 auto 0; z-index: 10;
+    display: flex; align-items: center; gap: 14px;
+    height: 48px; padding: 0 16px;
+    background: var(--bar);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+    transition: transform .2s ease;
+  }
+  #bar.hidden { transform: translateY(-100%); }
+  #back { color: var(--dim); text-decoration: none; white-space: nowrap; }
+  #back:hover { color: var(--accent); }
+  #title {
+    flex: 1; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-weight: 600;
+  }
+  #bar select, #bar button {
+    height: 30px; padding: 0 10px;
+    background: #1b1b1f; color: var(--ink);
+    border: 1px solid var(--line); border-radius: 6px;
+    font: inherit; cursor: pointer;
+  }
+  #bar button:hover, #bar select:hover { border-color: var(--accent); }
+  #bar button:focus-visible, #bar select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #counter { color: var(--dim); font-variant-numeric: tabular-nums; min-width: 78px; text-align: right; }
+  .group { display: flex; gap: 4px; align-items: center; }
+
+  /* pages */
+  #pages { margin: 0 auto; width: min(var(--w), 100vw); padding-top: 48px; }
+  .chapter-label {
+    padding: 36px 16px 14px; text-align: center;
+    color: var(--accent); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; font-size: 12px;
+  }
+  .page { display: block; width: 100%; background: #151518; min-height: 40vh; }
+  .page img { display: block; width: 100%; height: auto; }
+  .page.loaded { min-height: 0; background: none; }
+
+  /* page-by-page mode */
+  #viewer { display: none; }
+  body.paged #pages { display: none; }
+  body.paged #viewer { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+  body.paged.fitwidth #viewer { align-items: flex-start; }
+  #viewer img { display: block; max-width: 100vw; max-height: 100vh; width: auto; height: auto; user-select: none; }
+  body.paged.fitwidth #viewer img { max-height: none; width: min(var(--w), 100vw); }
+  body:not(.paged) #fit, body.paged:not(.fitwidth) .widthbtns { display: none; }
+  body.paged { cursor: default; }
+
+  #end { padding: 70px 16px 120px; text-align: center; color: var(--dim); }
+  #end button {
+    margin-top: 14px; height: 36px; padding: 0 16px;
+    background: #1b1b1f; color: var(--ink); border: 1px solid var(--line); border-radius: 6px;
+    font: inherit; cursor: pointer;
+  }
+  #end button:hover { border-color: var(--accent); }
+
+  #progress { position: fixed; left: 0; bottom: 0; height: 3px; background: var(--accent); width: 0; z-index: 11; }
+  #msg { padding: 120px 20px; text-align: center; color: var(--dim); }
+</style>
+</head>
+<body>
+<header id="bar">
+  <a id="back" href="/" title="Back to the library">&#8592; Library</a>
+  <div id="title">Loading...</div>
+  <div class="group">
+    <button id="prev" title="Previous chapter (p)">&#8249;</button>
+    <select id="chapters" title="Chapters"></select>
+    <button id="next" title="Next chapter (n)">&#8250;</button>
+  </div>
+  <div class="group">
+    <button id="mode" title="Switch between page mode and scroll mode (m)">Page</button>
+    <button id="fit" title="Fit screen / fit width (w)">Fit</button>
+    <span class="group widthbtns">
+    <button id="narrower" title="Narrower (-)">&minus;</button>
+    <button id="wider" title="Wider (+)">+</button>
+    </span>
+    <button id="fs" title="Fullscreen (f)">&#9974;</button>
+  </div>
+  <div id="counter"></div>
+</header>
+<main id="pages"></main>
+<div id="viewer"><img id="page-img" alt=""></div>
+<div id="progress"></div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const bar = $("bar"), pagesEl = $("pages"), select = $("chapters");
+  const params = new URLSearchParams(location.search);
+  const query = "a=" + encodeURIComponent(params.get("a") || "") + "&m=" + encodeURIComponent(params.get("m") || "");
+  $("back").href = "/author?a=" + encodeURIComponent(params.get("a") || "");
+  const WIDTH_STEP = 100, WIDTH_MIN = 400;
+  let pages = [], els = [], chapters = [], current = 0, saveTimer = null;
+  let paged = true, fitWidth = false;
+
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+  };
+
+  /* ---------- width ---------- */
+  let width = parseInt(store.get("reader-width"), 10) || 800;
+  function applyWidth() {
+    width = Math.max(WIDTH_MIN, Math.min(width, 2400));
+    document.documentElement.style.setProperty("--w", width + "px");
+    store.set("reader-width", width);
+  }
+  function setWidth(next) {
+    if (paged) { width = next; applyWidth(); return; }
+    const keep = currentPosition();
+    width = next; applyWidth();
+    scrollToPosition(keep.index, keep.fraction);
+  }
+
+  /* ---------- build ---------- */
+  function build(data) {
+    pages = data.pages;
+    $("title").textContent = data.title;
+    document.title = data.title;
+
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) { load(entry.target); observer.unobserve(entry.target); }
+      }
+    }, { rootMargin: "2500px 0px" });
+
+    pages.forEach((page, i) => {
+      if (page.chapter) {
+        const label = document.createElement("div");
+        label.className = "chapter-label";
+        label.textContent = "Chapter " + page.chapter;
+        pagesEl.appendChild(label);
+        chapters.push({ label: "Chapter " + page.chapter, index: i });
+      }
+      const box = document.createElement("div");
+      box.className = "page";
+      box.dataset.i = i;
+      if (page.w && page.h) box.style.aspectRatio = page.w + " / " + page.h;
+      pagesEl.appendChild(box);
+      els.push(box);
+      observer.observe(box);
+    });
+
+    if (!chapters.length) chapters.push({ label: "Start", index: 0 });
+    else if (chapters[0].index > 0) chapters.unshift({ label: "Start", index: 0 });
+
+    chapters.forEach((c, n) => {
+      const option = document.createElement("option");
+      option.value = n; option.textContent = c.label;
+      select.appendChild(option);
+    });
+
+    const end = document.createElement("div");
+    end.id = "end";
+    end.innerHTML = "<div>End of " + escapeHtml(data.title) + "</div>";
+    const top = document.createElement("button");
+    top.textContent = "Back to top";
+    top.onclick = () => window.scrollTo({ top: 0 });
+    end.appendChild(top);
+    pagesEl.appendChild(end);
+  }
+
+  function escapeHtml(text) {
+    return text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  }
+
+  function load(box) {
+    if (box.firstChild) return Promise.resolve();
+    return new Promise((resolve) => {
+      const img = document.createElement("img");
+      img.alt = "Page " + (+box.dataset.i + 1);
+      img.decoding = "async";
+      img.onload = img.onerror = () => { box.classList.add("loaded"); box.style.aspectRatio = ""; resolve(); };
+      img.src = "/img?" + query + "&i=" + box.dataset.i;
+      box.appendChild(img);
+    });
+  }
+
+  /* ---------- position ---------- */
+  function currentPosition() {
+    const line = window.innerHeight * 0.3;
+    let index = current;
+    // walk from the last known page, cheap on long folders
+    while (index > 0 && els[index].getBoundingClientRect().top > line) index--;
+    while (index < els.length - 1 && els[index].getBoundingClientRect().bottom <= line) index++;
+    const rect = els[index].getBoundingClientRect();
+    const fraction = rect.height ? Math.max(0, Math.min((line - rect.top) / rect.height, 1)) : 0;
+    return { index, fraction };
+  }
+
+  function scrollToPosition(index, fraction = 0) {
+    const box = els[index];
+    if (!box) return;
+    const line = window.innerHeight * 0.3;  // same reference line as currentPosition()
+    window.scrollTo({ top: box.getBoundingClientRect().top + window.scrollY + box.offsetHeight * fraction - line });
+  }
+
+  function goToChapter(n) {
+    n = Math.max(0, Math.min(n, chapters.length - 1));
+    if (paged) { showPage(chapters[n].index); return; }
+    const box = els[chapters[n].index];
+    // land on the chapter label when there is one
+    const target = box.previousElementSibling && box.previousElementSibling.className === "chapter-label"
+      ? box.previousElementSibling : box;
+    window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 48 });
+  }
+
+  function chapterOf(index) {
+    let n = 0;
+    chapters.forEach((c, k) => { if (c.index <= index) n = k; });
+    return n;
+  }
+
+  function onScroll() {
+    if (paged) return;
+    const pos = currentPosition();
+    current = pos.index;
+    $("counter").textContent = (current + 1) + " / " + pages.length;
+    select.value = chapterOf(current);
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    $("progress").style.width = (max > 0 ? (window.scrollY / max) * 100 : 0) + "%";
+
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => save(pos), 700);
+  }
+
+  function save(pos) {
+    fetch("/api/progress?" + query, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ index: pos.index, fraction: pos.fraction }),
+      keepalive: true,
+    }).catch(() => {});
+  }
+
+  /* ---------- bar: hide while reading down, show when scrolling up ---------- */
+  let lastY = 0, barLocked = false;
+  function updateBar() {
+    if (paged) return;
+    const y = window.scrollY;
+    if (!barLocked) {
+      if (y < 60 || y < lastY - 4) bar.classList.remove("hidden");
+      else if (y > lastY + 4) bar.classList.add("hidden");
+    }
+    lastY = y;
+  }
+  document.addEventListener("mousemove", (e) => {
+    if (barLocked) return;
+    if (e.clientY < 50) bar.classList.remove("hidden");
+    else if (paged && e.clientY > 110) bar.classList.add("hidden");
+  });
+
+  let ticking = false;
+  window.addEventListener("scroll", () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => { onScroll(); updateBar(); ticking = false; });
+  }, { passive: true });
+
+  /* ---------- page-by-page mode ---------- */
+  const viewerImg = $("page-img");
+  const imgUrl = (i) => "/img?" + query + "&i=" + i;
+
+  function showPage(i) {
+    i = Math.max(0, Math.min(i, pages.length - 1));
+    current = i;
+    viewerImg.src = imgUrl(i);
+    window.scrollTo(0, 0);
+    // warm the cache for the pages around this one
+    [i + 1, i + 2, i - 1].forEach((k) => { if (k >= 0 && k < pages.length) new Image().src = imgUrl(k); });
+
+    const chapter = chapters[chapterOf(i)];
+    $("counter").textContent = (i + 1) + " / " + pages.length;
+    select.value = chapterOf(i);
+    $("progress").style.width = ((i + 1) / pages.length) * 100 + "%";
+    document.title = $("title").textContent + " · " + (i + 1) + "/" + pages.length;
+
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => save({ index: i, fraction: 0 }), 500);
+  }
+
+  const step = (d) => showPage(current + d);
+
+  // click the left half of a page to go back, the right half to go forward
+  $("viewer").addEventListener("click", (e) => {
+    if (!paged || e.button !== 0) return;
+    step(e.clientX < window.innerWidth / 2 ? -1 : 1);
+  });
+
+  async function setMode(wantPaged) {
+    paged = wantPaged;
+    store.set("reader-mode", paged ? "paged" : "scroll");
+    document.body.classList.toggle("paged", paged);
+    $("mode").textContent = paged ? "Page" : "Scroll";
+    if (paged) {
+      bar.classList.add("hidden");
+      showPage(current);
+    } else {
+      bar.classList.remove("hidden");
+      document.title = $("title").textContent;
+      await Promise.all(els.slice(0, current + 1).map(load));
+      scrollToPosition(current, 0);
+      onScroll();
+    }
+  }
+
+  function setFit(wantWidth) {
+    fitWidth = wantWidth;
+    store.set("reader-fit", fitWidth ? "width" : "screen");
+    document.body.classList.toggle("fitwidth", fitWidth);
+    $("fit").textContent = fitWidth ? "Width" : "Screen";
+    window.scrollTo(0, 0);
+  }
+
+  /* ---------- controls ---------- */
+  select.onchange = () => goToChapter(+select.value);
+  $("prev").onclick = () => goToChapter(chapterOf(current) - (isAtChapterStart() ? 1 : 0));
+  $("next").onclick = () => goToChapter(chapterOf(current) + 1);
+  $("narrower").onclick = () => setWidth(width - WIDTH_STEP);
+  $("wider").onclick = () => setWidth(width + WIDTH_STEP);
+  $("fs").onclick = toggleFullscreen;
+  $("mode").onclick = () => setMode(!paged);
+  $("fit").onclick = () => setFit(!fitWidth);
+
+  function isAtChapterStart() {
+    if (paged) return chapters[chapterOf(current)].index === current;
+    return chapters[chapterOf(current)].index === current && currentPosition().fraction < 0.1;
+  }
+  function toggleFullscreen() {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen().catch(() => {});
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.target === select) return;
+    if (paged) {
+      const forward = { ArrowRight: 1, PageDown: 1, " ": e.shiftKey ? -1 : 1 };
+      const back = { ArrowLeft: -1, PageUp: -1 };
+      const d = e.key in forward ? forward[e.key] : back[e.key];
+      if (d) { step(d); e.preventDefault(); return; }
+      if (e.key === "Home") { showPage(0); e.preventDefault(); return; }
+      if (e.key === "End") { showPage(pages.length - 1); e.preventDefault(); return; }
+    }
+    switch (e.key) {
+      case "m": $("mode").click(); break;
+      case "w": $("fit").click(); break;
+      case "n": case "]": $("next").click(); break;
+      case "p": case "[": $("prev").click(); break;
+      case "+": case "=": $("wider").click(); break;
+      case "-": case "_": $("narrower").click(); break;
+      case "f": toggleFullscreen(); break;
+      case "h": barLocked = !barLocked; bar.classList.toggle("hidden", barLocked); break;
+      default: return;
+    }
+    e.preventDefault();
+  });
+
+  /* ---------- start ---------- */
+  applyWidth();
+  paged = store.get("reader-mode") !== "scroll";
+  fitWidth = store.get("reader-fit") === "width";
+  document.body.classList.toggle("paged", paged);
+  document.body.classList.toggle("fitwidth", fitWidth);
+  $("mode").textContent = paged ? "Page" : "Scroll";
+  $("fit").textContent = fitWidth ? "Width" : "Screen";
+  if (paged) bar.classList.add("hidden");
+  fetch("/api/manga?" + query).then((r) => r.json()).then(async (data) => {
+    build(data);
+    const saved = data.progress || {};
+    const index = Math.min(saved.index || 0, els.length - 1);
+    if (paged) {
+      showPage(index);
+      return;
+    }
+    if (index > 0) {
+      // load the pages above the saved spot first so the position is exact
+      await Promise.all(els.slice(0, index + 1).map(load));
+      scrollToPosition(index, saved.fraction || 0);
+    }
+    onScroll();
+    lastY = window.scrollY;
+  }).catch(() => {
+    pagesEl.innerHTML = '<div id="msg">Could not load this manga. Is the reader still running in the terminal?</div>';
+  });
+})();
+</script>
+</body>
+</html>

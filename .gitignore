@@ -19,3 +19,7 @@ test/*
 
 # VS Code settings
 .vscode/
+
+# web
+reader_progress.json.reader_cache/
+reader_progress.json

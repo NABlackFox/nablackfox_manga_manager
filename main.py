@@ -3,6 +3,7 @@ import sys
 from utils import RED, RESET, clear_screen, enable_ansi, print_header
 from pages.author_menu import ask_for_author, run_author_menu
 from pages.admin_menu import run_admin_menu
+from pages.read_page import run_read_mode
 
 # Mother folder: contains one folder per author, each holding the manga folders
 import os
@@ -35,6 +36,8 @@ def main():
         return
       if author.casefold() == "admin":
         run_admin_menu(MANGA_ROOT)
+      elif author.casefold() == "read":
+        run_read_mode(MANGA_ROOT)
       else:
         run_author_menu(author, MANGA_ROOT)
   except (KeyboardInterrupt, EOFError):
