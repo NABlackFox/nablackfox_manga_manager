@@ -31,7 +31,8 @@ def run_update_chapter(author, manga_root):
 
   new_folder = ask_single_folder(
       author, data["candidates"], TITLE,
-      f"Enter the number of the folder with the NEW chapter {chapter}.", manga_root
+      f"Enter the number of the folder with the NEW chapter {chapter}.", manga_root,
+      split=data["split"],
   )
   if new_folder is None:
     return

@@ -20,6 +20,7 @@ def run_add_new_chapters(author, manga_root):
 
   chosen = ask_merge_order(
       author, data["candidates"], manga_root, title=TITLE, verb="added",
+      split=data["split"],
       note=f"Adding to: {GREEN}{folder.name}{RESET}",
   )
   if chosen is None:

@@ -31,6 +31,7 @@ def run_add_missing_chapter(author, manga_root):
 
   chosen = ask_merge_order(
       author, data["candidates"], manga_root, title=TITLE, verb="inserted",
+      split=data["split"],
       note=f"Inserting into: {GREEN}{folder.name}{RESET} starting as chapter {first_chapter}",
   )
   if chosen is None:

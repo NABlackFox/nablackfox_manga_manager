@@ -60,9 +60,14 @@ def load_merged_folder(author, manga_root, title, merged_only=True, allow_empty=
     return None
 
   pages, markers = merged_folder.read_pages(folder)
+  others = [f for f in folders if f != folder]
+  unmerged = [f for f in others if not merged_folder.merged_chapter_count(f)]
+  merged = [f for f in others if merged_folder.merged_chapter_count(f)]
   return {
       "folder": folder,
-      "candidates": [f for f in folders if f != folder],
+      # Unmerged folders first, then other merged ones (shown in a separate group).
+      "candidates": unmerged + merged,
+      "split": len(unmerged),
       "info": info,
       "pages": pages,
       "markers": markers,

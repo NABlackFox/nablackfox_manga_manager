@@ -62,15 +62,29 @@ def message_screen(author, lines, manga_root, title):
   print()
   pause()
 
-def ask_single_folder(author, folders, title, question, manga_root):
+def print_folder_list(folders, split=None, chosen=()):
+  """Numbered folder list. With `split`, folders from that index on are a separate 'merged' group."""
+  digits = len(str(len(folders)))
+  for number, folder in enumerate(folders, start=1):
+    if split is not None and number - 1 == 0 and split > 0:
+      print(f"  {BOLD}Unmerged chapters{RESET}\n")
+    if split is not None and number - 1 == split:
+      if split > 0:
+        print()
+      print(f"  {BOLD}{RED}Already merged folders (be careful, this combines two merged manga){RESET}\n")
+    if folder in chosen:
+      print(f"  {DIM}{number:>{digits}}  {folder.name}{RESET}")
+    else:
+      color = RED if split is not None and number - 1 >= split else CYAN
+      print(f"  {YELLOW}{number:>{digits}}{RESET}  {color}{folder.name}{RESET}")
+
+def ask_single_folder(author, folders, title, question, manga_root, split=None):
   error = ""
   while True:
     clear_screen()
     print_header(manga_root, f"Library: {manga_root}")
     print_title(title, author)
-    digits = len(str(len(folders)))
-    for number, folder in enumerate(folders, start=1):
-      print(f"  {YELLOW}{number:>{digits}}{RESET}  {CYAN}{folder.name}{RESET}")
+    print_folder_list(folders, split)
     print(f"\n  {DIM}{question}  Esc to cancel.{RESET}\n")
     if error:
       print(f"  {RED}{error}{RESET}\n")
@@ -102,46 +116,46 @@ def ask_number(question, show, parse):
     except ValueError as exc:
       error = str(exc)
 
-def show_merge_screen(author, folders, chosen, error="", title="Merge manga", note="", verb="merged", manga_root=None):
+def show_merge_screen(author, folders, chosen, error="", title="Merge manga", note="", verb="merged", manga_root=None,
+                      noun="folder", chosen_label="Order so far", ordered=True, split=None):
   clear_screen()
   print_header(manga_root, f"Library: {manga_root}")
   print_title(title, author)
 
-  digits = len(str(len(folders)))
-  for number, folder in enumerate(folders, start=1):
-    if folder in chosen:
-      print(f"  {DIM}{number:>{digits}}  {folder.name}{RESET}")
-    else:
-      print(f"  {YELLOW}{number:>{digits}}{RESET}  {CYAN}{folder.name}{RESET}")
+  print_folder_list(folders, split, chosen)
   print()
 
   if chosen:
-    print(f"  {BOLD}Order so far{RESET}\n")
+    print(f"  {BOLD}{chosen_label}{RESET}\n")
     for folder in chosen:
       print(f"  {folder.name}")
     print()
 
-  print(f"  {DIM}Enter the number of each folder in the order it should be {verb} (e.g. 3, or 1 4 2, or 5-9).{RESET}")
+  order_text = f" in the order it should be {verb}" if ordered else ""
+  print(f"  {DIM}Enter the number of each {noun}{order_text} (e.g. 3, or 1 4 2, or 5-9).{RESET}")
   print(f"  {DIM}Press Enter on an empty line when you are done.  Esc to cancel.{RESET}\n")
   if note:
     print(f"  {note}\n")
   if error:
     print(f"  {RED}{error}{RESET}\n")
 
-def ask_merge_order(author, folders, manga_root, **screen):
-  """Let the user pick several folders in order. None when cancelled."""
+def ask_merge_order(author, folders, manga_root, prompt_label="Folder", **screen):
+  """Let the user pick several items in order. None when cancelled.
+
+  Items only need a `.name`. Extra keyword arguments go to show_merge_screen.
+  """
   chosen = []
   error = ""
   while True:
     show_merge_screen(author, folders, chosen, error, manga_root=manga_root, **screen)
     error = ""
-    text = read_text(f"  Folder {len(chosen) + 1} > ")
+    text = read_text(f"  {prompt_label} {len(chosen) + 1} > ")
     if text is None:
       return None
 
     if not text.strip():
       if not chosen:
-        error = "Pick at least one folder first."
+        error = f"Pick at least one {screen.get('noun', 'folder')} first."
         continue
       return chosen
 
