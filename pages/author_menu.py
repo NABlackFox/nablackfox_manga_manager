@@ -10,12 +10,14 @@ from pages.unzip_page import run_unzip
 from pages.merge_page import run_merge
 from pages.edit_merged_menu import run_edit_merged_menu
 from pages.marker_page import run_markers
+from pages.delete_page import run_delete_pages
 
 FUNCTIONS = {
     "1": "Unzip manga",
     "2": "Merge manga",
     "3": "Edit Merged Chapters",
     "4": "Edit chapter marker",
+    "5": "Delete pages",
 }
 
 def list_folders_sorted(parent):
@@ -145,6 +147,7 @@ def run_author_menu(author, manga_root):
         "2": lambda a: run_merge(a, manga_root),
         "3": lambda a: run_edit_merged_menu(a, manga_root),
         "4": lambda a: run_markers(a, manga_root),
+        "5": lambda a: run_delete_pages(a, manga_root),
     }
     if choice in runners:
       runners[choice](author)

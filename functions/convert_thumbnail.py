@@ -6,8 +6,13 @@ import os
 from utils import IMAGE_EXTENSIONS, GREEN, YELLOW, RED, DIM, RESET
 
 
-# Recognize only the first page's expected numeric names.
-FIRST_PAGE_NAMES = {"1", "01", "001"}
+# Recognize only the first page's expected names, in priority order.
+# Plain numbers come first; the "-chapter1" ones are the first page of a
+# merged folder that has chapter markers (e.g. 001-chapter1.png).
+FIRST_PAGE_NAMES = (
+    "1", "01", "001",
+    "1-chapter1", "01-chapter1", "001-chapter1",
+)
 
 def find_first_image(chapter_folder):
     """Find the first page using a fixed filename priority."""
@@ -32,7 +37,7 @@ def find_first_image(chapter_folder):
     except OSError as exc:
         return None, str(exc)
 
-    for name in ("1", "01", "001"):
+    for name in FIRST_PAGE_NAMES:
         if name in candidates:
             # If multiple extensions share the same number,
             # choose a consistent filename order.
