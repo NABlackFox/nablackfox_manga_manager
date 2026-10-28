@@ -8,6 +8,7 @@
   :root {
     --bg: #0e0e10; --card: #17171a; --ink: #e8e6e1; --dim: #8d8a84;
     --line: #2a2a2e; --accent: #e0a458;
+    --hh: 57px; /* header height, used by the letter bar */
   }
   * { box-sizing: border-box; }
   html { background: var(--bg); color: var(--ink); }
@@ -16,7 +17,7 @@
   header {
     position: sticky; top: 0; z-index: 5;
     display: flex; align-items: center; gap: 16px;
-    padding: 12px 24px; background: rgba(14,14,16,.94); backdrop-filter: blur(8px);
+    height: var(--hh); padding: 0 24px; background: rgba(14,14,16,.94); backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--line);
   }
   header h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -31,6 +32,25 @@
   input[type=search]:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 
   main { padding: 24px; max-width: 1500px; margin: 0 auto; }
+  /* letter bar + letter sections (authors page only) */
+  #jump {
+    position: sticky; top: var(--hh); z-index: 4;
+    display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 24px;
+    background: rgba(14,14,16,.94); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line);
+  }
+  #jump a {
+    min-width: 28px; height: 28px; padding: 0 6px; display: grid; place-items: center;
+    border-radius: 6px; color: var(--ink); text-decoration: none; font-weight: 650; font-size: 13px;
+  }
+  #jump a:hover, #jump a:focus-visible { background: var(--card); color: var(--accent); outline: none; }
+  #jump a.off { color: #4a4a50; pointer-events: none; }
+  section.group { margin-bottom: 36px; }
+  section.group > h2 {
+    display: flex; align-items: center; gap: 10px; margin: 0 0 14px;
+    font-size: 22px; line-height: 1; color: var(--accent);
+  }
+  section.group > h2 .n { font-size: 12px; font-weight: 400; color: var(--dim); }
+  section.group > h2::after { content: ""; flex: 1; border-bottom: 1px solid var(--line); }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 20px 16px; }
 
   a.card { display: block; color: inherit; text-decoration: none; }
@@ -67,8 +87,9 @@
   <span class="spacer"></span>
   <input type="search" id="search" placeholder="Filter  ( / )" autocomplete="off">
 </header>
+<nav id="jump" hidden></nav>
 <main>
-  <div class="grid" id="grid"></div>
+  <div id="groups"></div>
   <div id="empty" hidden>Nothing matches.</div>
 </main>
 
@@ -79,10 +100,11 @@
   const author = params.get("a");
   const enc = encodeURIComponent;
   let items = [];
+  let sections = [];
 
   function card({ href, thumb, name, sub, badge, progress }) {
     const a = document.createElement("a");
-    a.className = "card"; a.href = href; a.dataset.name = name.toLowerCase();
+    a.className = "card"; a.href = href; a.dataset.name = name.toLowerCase(); a.dataset.title = name;
 
     const box = document.createElement("div");
     box.className = "thumb";
@@ -106,6 +128,12 @@
     return a;
   }
 
+  // Same rule as the terminal (group_key in utils.py): first letter A-Z, or "#" for numbers/symbols.
+  function groupKey(name) {
+    const first = name.normalize("NFD")[0] || "";
+    return /\p{L}/u.test(first) ? first.toUpperCase() : "#";
+  }
+
   function render() {
     const needle = $("search").value.trim().toLowerCase();
     let shown = 0;
@@ -114,14 +142,71 @@
       el.hidden = !match;
       if (match) shown++;
     }
+    // hide letters that have no match, grey out their button in the letter bar
+    for (const sec of sections) {
+      const visible = sec.cards.filter((c) => !c.hidden).length;
+      sec.el.hidden = visible === 0;
+      sec.count.textContent = needle ? visible + " / " + sec.cards.length : sec.cards.length;
+      sec.link.classList.toggle("off", visible === 0);
+    }
     $("empty").hidden = shown > 0;
     $("count").textContent = needle ? shown + " / " + items.length : items.length;
   }
 
-  function show(cards) {
-    const grid = $("grid");
-    grid.replaceChildren(...cards);
+  function grid(cards) {
+    const g = document.createElement("div");
+    g.className = "grid";
+    g.append(...cards);
+    return g;
+  }
+
+  // keyFor given -> cards are split into lettered sections with a jump bar; otherwise one plain grid
+  function show(cards, keyFor) {
     items = cards;
+    sections = [];
+    const root = $("groups"), jump = $("jump");
+    jump.replaceChildren();
+    jump.hidden = !keyFor;
+
+    if (!keyFor) {
+      root.replaceChildren(grid(cards));
+      render();
+      return;
+    }
+
+    const groups = new Map();
+    for (const c of cards) {
+      const k = keyFor(c);
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(c);
+    }
+    // "#" first, then A-Z (same order as the terminal)
+    const keys = [...groups.keys()].sort(
+      (a, b) => (a === "#" ? 0 : 1) - (b === "#" ? 0 : 1) || (a < b ? -1 : a > b ? 1 : 0)
+    );
+
+    const parts = [];
+    for (const k of keys) {
+      const el = document.createElement("section");
+      el.className = "group"; el.id = "g-" + k;
+      const h = document.createElement("h2");
+      const count = document.createElement("span");
+      count.className = "n";
+      h.append(k, count);
+      el.append(h, grid(groups.get(k)));
+      parts.push(el);
+
+      const link = document.createElement("a");
+      link.href = "#g-" + k; link.textContent = k;
+      link.addEventListener("click", (e) => {
+        e.preventDefault();
+        const offset = $("jump").getBoundingClientRect().bottom + 12;
+        window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - offset, behavior: "smooth" });
+      });
+      jump.appendChild(link);
+      sections.push({ el, cards: groups.get(k), count, link });
+    }
+    root.replaceChildren(...parts);
     render();
   }
 
@@ -134,7 +219,7 @@
         thumb: a.thumb ? "/thumb?a=" + enc(a.name) : null,
         name: a.name,
         sub: a.count + " manga",
-      })));
+      })), (c) => groupKey(c.dataset.title));
     } else {
       const res = await fetch("/api/author?a=" + enc(author));
       if (!res.ok) { $("heading").textContent = "Author not found"; $("empty").hidden = false; $("empty").textContent = "That author folder no longer exists."; return; }
