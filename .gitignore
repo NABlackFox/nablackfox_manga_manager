@@ -23,3 +23,4 @@ test/*
 # web
 reader_progress.json
 .reader_cache/
+webp_converted.json

@@ -392,7 +392,10 @@
   fetch("/api/manga?" + query).then((r) => r.json()).then(async (data) => {
     build(data);
     const saved = data.progress || {};
-    const index = Math.min(saved.index || 0, els.length - 1);
+    // ?p=N (from the preview page) wins over the saved position
+    const wanted = parseInt(params.get("p"), 10);
+    const index = Math.min(wanted > 0 ? wanted - 1 : (saved.index || 0), els.length - 1);
+    if (wanted > 0) saved.fraction = 0;
     if (paged) {
       showPage(index);
       return;

@@ -1,4 +1,5 @@
 import hashlib
+import io
 import json
 import mimetypes
 import threading
@@ -6,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from functions.convert_thumbnail import find_first_image
+from functions.convert_to_webp import find_first_image
 from utils import list_images, list_subfolders, parse_page
 
 try:
@@ -53,6 +54,27 @@ def manga_thumb_source(manga_folder):
     return first
   images = list_images(manga_folder)
   return images[0] if images else None
+
+
+def render_thumb(source, size=THUMB_WIDTH):
+  """Small JPEG of an image, made on the spot. Nothing is saved to disk."""
+  if Image is None:
+    return source.read_bytes()
+  with Image.open(source) as image:
+    try:
+      image.draft("RGB", (size * 2, size * 4))  # JPEG: decode at reduced size, much faster
+    except Exception:
+      pass
+    image = ImageOps.exif_transpose(image)
+    try:
+      image.seek(0)
+    except EOFError:
+      pass
+    image = image.convert("RGB")
+    image.thumbnail((size, size * 2))
+    out = io.BytesIO()
+    image.save(out, format="JPEG", quality=80)
+  return out.getvalue()
 
 
 def make_thumb(source):
@@ -167,6 +189,8 @@ def make_handler(manga_root):
           self._html("library.html")
         elif url.path == "/author":
           self._html("library.html")
+        elif url.path == "/manga":
+          self._html("manga.html")
         elif url.path == "/read":
           self._html("index.html")
         elif url.path == "/api/library":
@@ -177,6 +201,8 @@ def make_handler(manga_root):
           self._json(self._manga(author, manga))
         elif url.path == "/thumb":
           self._thumb(author, manga)
+        elif url.path == "/pthumb":
+          self._page_thumb(author, manga, query.get("i", ""))
         elif url.path == "/img":
           self._image(author, manga, query.get("i", ""))
         else:
@@ -265,6 +291,14 @@ def make_handler(manga_root):
       if source is None:
         raise LookupError
       self._send(200, make_thumb(source), "image/jpeg", "max-age=3600")
+
+    def _page_thumb(self, author, manga, index):
+      files = [p["file"] for p in scan_pages(self._require_manga(author, manga))]
+      i = int(index)
+      if not 0 <= i < len(files):
+        raise LookupError
+      # same small-copy cache as the covers; only pages you actually preview get saved
+      self._send(200, make_thumb(files[i]), "image/jpeg", "max-age=3600")
 
     def _image(self, author, manga, index):
       files = [p["file"] for p in scan_pages(self._require_manga(author, manga))]
