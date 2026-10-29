@@ -77,6 +77,15 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const params = new URLSearchParams(location.search);
+  $("back").addEventListener("click", (e) => {
+    try {
+      const from = new URL(document.referrer);
+      if (from.origin === location.origin && (from.pathname === "/" || from.pathname === "/author") && history.length > 1) {
+        e.preventDefault();
+        history.back();
+      }
+    } catch (_) { /* no referrer: follow the normal link */ }
+  });
   const author = params.get("a") || "", manga = params.get("m") || "";
   const query = "a=" + encodeURIComponent(author) + "&m=" + encodeURIComponent(manga);
   const BATCH = 10;
@@ -129,7 +138,6 @@
     document.title = data.title;
     $("title").textContent = data.title;
     $("title").title = data.title;
-    $("back").href = "/author?a=" + encodeURIComponent(author);
     $("meta").textContent = pages.length + " pages";
 
     const saved = data.progress || {};

@@ -113,7 +113,6 @@
   const bar = $("bar"), pagesEl = $("pages"), select = $("chapters");
   const params = new URLSearchParams(location.search);
   const query = "a=" + encodeURIComponent(params.get("a") || "") + "&m=" + encodeURIComponent(params.get("m") || "");
-  $("back").href = "/author?a=" + encodeURIComponent(params.get("a") || "");
   const WIDTH_STEP = 100, WIDTH_MIN = 400;
   let pages = [], els = [], chapters = [], current = 0, saveTimer = null;
   let paged = true, fitWidth = false;

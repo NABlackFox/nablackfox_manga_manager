@@ -49,6 +49,8 @@
     display: flex; align-items: center; gap: 10px; margin: 0 0 14px;
     font-size: 22px; line-height: 1; color: var(--accent);
   }
+  section.group > h2 a { color: inherit; text-decoration: none; }
+  section.group > h2 a:hover { text-decoration: underline; }
   section.group > h2 .n { font-size: 12px; font-weight: 400; color: var(--dim); }
   section.group > h2::after { content: ""; flex: 1; border-bottom: 1px solid var(--line); }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 20px 16px; }
@@ -99,8 +101,6 @@
   const params = new URLSearchParams(location.search);
   const author = params.get("a");
   const enc = encodeURIComponent;
-  let items = [];
-  let sections = [];
 
   function card({ href, thumb, name, sub, badge, progress }) {
     const a = document.createElement("a");
@@ -133,108 +133,241 @@
     const first = name.normalize("NFD")[0] || "";
     return /\p{L}/u.test(first) ? first.toUpperCase() : "#";
   }
+  const letterOrder = (a, b) => (a === "#" ? 0 : 1) - (b === "#" ? 0 : 1) || (a < b ? -1 : a > b ? 1 : 0);
+
+  // One section = one author name followed by that author's manga.
+  // On an author page there is a single section with no heading.
+  let sections = [];
+  let letterLinks = new Map();   // letter -> button in the letter bar
+  let runId = 0;                 // bumped on every (re)load so stale fetches are ignored
+
+  function makeSection(title, href) {
+    const el = document.createElement("section");
+    el.className = "group";
+    const count = document.createElement("span");
+    count.className = "n";
+    const grid = document.createElement("div");
+    grid.className = "grid";
+    if (title !== null) {
+      const h = document.createElement("h2");
+      const link = document.createElement("a");
+      link.href = href; link.textContent = title; link.title = "Open " + title;
+      h.append(link, count);
+      el.append(h);
+    }
+    el.append(grid);
+    return { el, grid, count, cards: [], loaded: false, title: title || "", key: groupKey(title || "") };
+  }
 
   function render() {
     const needle = $("search").value.trim().toLowerCase();
-    let shown = 0;
-    for (const el of items) {
-      const match = !needle || el.dataset.name.includes(needle);
-      el.hidden = !match;
-      if (match) shown++;
-    }
-    // hide letters that have no match, grey out their button in the letter bar
+    let shown = 0, total = 0;
+    const letterHasMatch = new Set();
+
     for (const sec of sections) {
-      const visible = sec.cards.filter((c) => !c.hidden).length;
-      sec.el.hidden = visible === 0;
-      sec.count.textContent = needle ? visible + " / " + sec.cards.length : sec.cards.length;
-      sec.link.classList.toggle("off", visible === 0);
+      // typing an author's name shows all of their manga; otherwise match the manga name
+      const authorHit = needle && sec.title.toLowerCase().includes(needle);
+      let visible = 0;
+      for (const c of sec.cards) {
+        const match = !needle || authorHit || c.dataset.name.includes(needle);
+        c.hidden = !match;
+        if (match) visible++;
+      }
+      shown += visible;
+      total += sec.cards.length;
+      sec.el.hidden = sec.loaded && visible === 0;   // empty authors / no match: hide
+      sec.count.textContent = !sec.loaded ? "loading..." : needle ? visible + " / " + sec.cards.length : sec.cards.length;
+      if (visible > 0) letterHasMatch.add(sec.key);
     }
-    $("empty").hidden = shown > 0;
-    $("count").textContent = needle ? shown + " / " + items.length : items.length;
+    for (const [k, link] of letterLinks) link.classList.toggle("off", !letterHasMatch.has(k) && sections.every((s) => s.loaded));
+
+    const loading = sections.some((s) => !s.loaded);
+    $("empty").textContent = needle ? "Nothing matches." : "No manga found.";
+    $("empty").hidden = shown > 0 || loading;
+    $("count").textContent = (needle ? shown + " / " + total : total) + (loading ? " ..." : "");
   }
 
-  function grid(cards) {
-    const g = document.createElement("div");
-    g.className = "grid";
-    g.append(...cards);
-    return g;
+  let queued = false;
+  function renderSoon() {            // many authors finish loading at once: draw once per frame
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => { queued = false; render(); });
   }
 
-  // keyFor given -> cards are split into lettered sections with a jump bar; otherwise one plain grid
-  function show(cards, keyFor) {
-    items = cards;
-    sections = [];
-    const root = $("groups"), jump = $("jump");
+  function mount(list) {
+    const y = window.scrollY;          // rebuilding the page must not throw you back to the top
+    sections = list;
+    $("groups").replaceChildren(...list.map((sec) => sec.el));
+    window.scrollTo(0, y);
+  }
+
+  // ---------- remembered state ----------
+  // Library data is cached in localStorage and shown instantly; a fresh copy is fetched in
+  // the background and the page is only rebuilt if something changed (e.g. reading progress).
+  // The scroll position is remembered per tab in sessionStorage.
+  const CACHE_KEY = "library-cache-v1";
+  const SCROLL_KEY = "scroll:" + location.pathname + location.search;
+
+  function readCache() {
+    try {
+      const data = JSON.parse(localStorage.getItem(CACHE_KEY));
+      return Array.isArray(data) ? data : null;
+    } catch (_) { return null; }
+  }
+  function writeCache(data) {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch (_) {}
+  }
+  function saveScroll() {
+    try { sessionStorage.setItem(SCROLL_KEY, String(Math.round(window.scrollY))); } catch (_) {}
+  }
+  function restoreScroll() {
+    try {
+      const y = Number(sessionStorage.getItem(SCROLL_KEY));
+      if (y > 0) window.scrollTo(0, y);
+    } catch (_) {}
+  }
+  history.scrollRestoration = "manual";   // we restore it ourselves, after the content exists
+  window.addEventListener("pagehide", saveScroll);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveScroll(); });
+
+  function buildLetterBar() {
+    const jump = $("jump");
     jump.replaceChildren();
-    jump.hidden = !keyFor;
-
-    if (!keyFor) {
-      root.replaceChildren(grid(cards));
-      render();
-      return;
-    }
-
-    const groups = new Map();
-    for (const c of cards) {
-      const k = keyFor(c);
-      if (!groups.has(k)) groups.set(k, []);
-      groups.get(k).push(c);
-    }
-    // "#" first, then A-Z (same order as the terminal)
-    const keys = [...groups.keys()].sort(
-      (a, b) => (a === "#" ? 0 : 1) - (b === "#" ? 0 : 1) || (a < b ? -1 : a > b ? 1 : 0)
-    );
-
-    const parts = [];
-    for (const k of keys) {
-      const el = document.createElement("section");
-      el.className = "group"; el.id = "g-" + k;
-      const h = document.createElement("h2");
-      const count = document.createElement("span");
-      count.className = "n";
-      h.append(k, count);
-      el.append(h, grid(groups.get(k)));
-      parts.push(el);
-
+    letterLinks = new Map();
+    const letters = [...new Set(sections.map((sec) => sec.key))].sort(letterOrder);
+    for (const k of letters) {
       const link = document.createElement("a");
-      link.href = "#g-" + k; link.textContent = k;
+      link.href = "#"; link.textContent = k;
       link.addEventListener("click", (e) => {
         e.preventDefault();
-        const offset = $("jump").getBoundingClientRect().bottom + 12;
-        window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - offset, behavior: "smooth" });
+        const target = sections.find((sec) => sec.key === k && !sec.el.hidden);
+        if (!target) return;
+        const offset = jump.getBoundingClientRect().bottom + 12;
+        window.scrollTo({ top: window.scrollY + target.el.getBoundingClientRect().top - offset, behavior: "smooth" });
       });
       jump.appendChild(link);
-      sections.push({ el, cards: groups.get(k), count, link });
+      letterLinks.set(k, link);
     }
-    root.replaceChildren(...parts);
+    jump.hidden = false;
+  }
+
+  const sortAuthors = (list) => list.sort((a, b) =>
+    letterOrder(groupKey(a.name), groupKey(b.name))
+    || a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }));
+
+  const mangaCards = (authorName, manga) => manga.map((m) => card({
+    href: "/manga?a=" + enc(authorName) + "&m=" + enc(m.name),
+    thumb: "/thumb?a=" + enc(authorName) + "&m=" + enc(m.name),
+    name: m.name,
+    sub: m.pages + " pages" + (m.read ? " · page " + m.read : ""),
+    progress: m.read / m.pages,
+  }));
+
+  function fillSection(sec, authorName, manga) {
+    sec.cards = mangaCards(authorName, manga);
+    sec.grid.append(...sec.cards);
+    sec.loaded = true;
+  }
+
+  // What is on screen right now: [{name, manga: [{name, pages, read}]}]
+  let shownData = null;
+
+  function showData(data) {
+    shownData = data;
+    const list = data.map((a) => {
+      const sec = makeSection(a.name, "/author?a=" + enc(a.name));
+      fillSection(sec, a.name, a.manga);
+      return sec;
+    });
+    mount(list);
+    buildLetterBar();
     render();
   }
 
-  async function start() {
-    if (author === null) {
-      const authors = await (await fetch("/api/library")).json();
-      document.title = "Library";
-      show(authors.map((a) => card({
-        href: "/author?a=" + enc(a.name),
-        thumb: a.thumb ? "/thumb?a=" + enc(a.name) : null,
-        name: a.name,
-        sub: a.count + " manga",
-      })), (c) => groupKey(c.dataset.title));
-    } else {
-      const res = await fetch("/api/author?a=" + enc(author));
-      if (!res.ok) { $("heading").textContent = "Author not found"; $("empty").hidden = false; $("empty").textContent = "That author folder no longer exists."; return; }
-      const data = await res.json();
-      document.title = data.name;
-      $("heading").textContent = data.name;
-      $("back").hidden = false;
-      show(data.manga.map((m) => card({
-        href: "/manga?a=" + enc(data.name) + "&m=" + enc(m.name),
-        thumb: "/thumb?a=" + enc(data.name) + "&m=" + enc(m.name),
-        name: m.name,
-        sub: m.pages + " pages" + (m.read ? " · page " + m.read : ""),
-        progress: m.read / m.pages,
-      })));
+  // Fetch the whole library. onList(data) / onAuthor(i) let the first-ever load fill in progressively.
+  async function fetchAll(id, onList, onAuthor) {
+    const authors = await (await fetch("/api/library")).json();
+    if (id !== runId) return null;
+    const data = sortAuthors(authors).map((a) => ({ name: a.name, manga: [] }));
+    if (onList) onList(data);
+
+    let next = 0, complete = true;
+    const gone = new Set();             // authors deleted while we were loading
+    const worker = async () => {
+      while (next < data.length) {
+        const i = next++;
+        try {
+          const res = await fetch("/api/author?a=" + enc(data[i].name));
+          if (id !== runId) return;
+          if (res.ok) data[i].manga = (await res.json()).manga;
+          else if (res.status === 404) gone.add(i);
+        } catch (_) { complete = false; }   // a failed author: never cache a partial library
+        if (onAuthor) onAuthor(i);
+      }
+    };
+    await Promise.all(Array.from({ length: 6 }, worker));
+    return id === runId ? { data: data.filter((_, i) => !gone.has(i)), complete } : null;
+  }
+
+  // Fetch fresh data quietly; rebuild the page (keeping the scroll position) only if it changed.
+  async function revalidate(id) {
+    const res = await fetchAll(id);
+    if (!res) return;
+    if (res.complete) writeCache(res.data);
+    if (JSON.stringify(res.data) !== JSON.stringify(shownData)) showData(res.data);
+  }
+
+  async function loadLibrary(id) {
+    document.title = "Library";
+
+    const cached = readCache();
+    if (cached) {                       // instant: no loading, back where you were
+      showData(cached);
+      restoreScroll();
+      return revalidate(id);
     }
+
+    // very first visit: no cache yet, so fill the sections in as they arrive
+    let live = null;
+    const res = await fetchAll(
+      id,
+      (data) => {
+        live = data;
+        mount(data.map((a) => makeSection(a.name, "/author?a=" + enc(a.name))));
+        buildLetterBar();
+        render();
+      },
+      (i) => {
+        fillSection(sections[i], live[i].name, live[i].manga);
+        renderSoon();
+      }
+    );
+    if (!res) return;
+    shownData = res.data;
+    if (res.complete) writeCache(res.data);
+    render();
+    restoreScroll();
+  }
+
+  async function loadAuthor(id) {
+    const res = await fetch("/api/author?a=" + enc(author));
+    if (!res.ok) { $("heading").textContent = "Author not found"; $("empty").hidden = false; $("empty").textContent = "That author folder no longer exists."; return; }
+    const data = await res.json();
+    if (id !== runId) return;
+    document.title = data.name;
+    $("heading").textContent = data.name;
+    $("back").hidden = false;
+
+    const sec = makeSection(null);
+    fillSection(sec, data.name, data.manga);
+    mount([sec]);
+    render();
+    restoreScroll();
+  }
+
+  function start() {
+    const id = ++runId;
+    return author === null ? loadLibrary(id) : loadAuthor(id);
   }
 
   $("search").addEventListener("input", render);
@@ -243,7 +376,10 @@
     else if (e.key === "Escape") { $("search").value = ""; $("search").blur(); render(); }
   });
   // back from the reader: refresh reading progress
-  window.addEventListener("pageshow", (e) => { if (e.persisted) start(); });
+  window.addEventListener("pageshow", (e) => {
+    if (!e.persisted) return;
+    if (author === null) revalidate(++runId); else start();
+  });
   start().catch(() => { $("empty").hidden = false; $("empty").textContent = "Could not load. Is read mode still running in the terminal?"; });
 })();
 </script>
