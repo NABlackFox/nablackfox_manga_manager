@@ -1,26 +1,6 @@
-# Python compiled files & cache
-**/__pycache__/
-*.py[cod]
-*.pyc
-*.pyo
-*.pyd
-
-# Virtual environments
-.venv/
-venv/
-
-# Test outputs / contents
-test/*
-
-# Local environment configuration
+__pycache__/
 .env
-.env.*
-!.env.example
-
-# VS Code settings
-.vscode/
-
-# web
-reader_progress.json
 .reader_cache/
+reader_progress.json
 webp_converted.json
+manga/

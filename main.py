@@ -1,29 +1,18 @@
-from pathlib import Path
 import sys
-from utils import RED, RESET, clear_screen, enable_ansi, print_header
-from pages.author_menu import ask_for_author, run_author_menu
-from pages.admin_menu import run_admin_menu
-from pages.read_page import run_read_mode
 
-# Mother folder: contains one folder per author, each holding the manga folders
-import os
-from pathlib import Path
-from dotenv import load_dotenv
+from config import MANGA_ROOT
+from terminal.utils import RED, RESET, clear_screen, enable_ansi, print_header
+from terminal.pages.author_menu import ask_for_author, run_author_menu
+from terminal.pages.admin_menu import run_admin_menu
+from terminal.pages.read_page import run_read_mode
 
-# Load the .env file from the project directory.
-PROJECT_ROOT = Path(__file__).resolve().parent
-load_dotenv(PROJECT_ROOT / ".env")
-
-MANGA_ROOT = Path(
-    os.getenv("MANGA_ROOT", str(PROJECT_ROOT / "manga"))
-).expanduser()
 
 def main():
   enable_ansi()
 
   if not MANGA_ROOT.is_dir():
     print(f"{RED}Library folder not found: {MANGA_ROOT}{RESET}")
-    print("Edit MANGA_ROOT at the top of main.py and try again.")
+    print("Set MANGA_ROOT in the .env file (or create a 'manga' folder) and try again.")
     sys.exit(1)
 
   try:
@@ -45,6 +34,7 @@ def main():
 
   clear_screen()
   print("Goodbye!")
+
 
 if __name__ == "__main__":
   main()

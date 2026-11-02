@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reader</title>
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/reader.css">
+</head>
+<body>
+<header class="bar" id="bar">
+  <a class="back" id="back" href="/" title="Back to the library">&#8592; <span>Library</span></a>
+  <div class="title" id="title">Loading...</div>
+  <div class="group">
+    <button id="prev" type="button" title="Previous chapter (p)">&#8249;</button>
+    <select id="chapters" title="Chapters"></select>
+    <button id="next" type="button" title="Next chapter (n)">&#8250;</button>
+  </div>
+  <div class="group">
+    <button id="mode" type="button" title="Switch between page mode and scroll mode (m)">Page</button>
+    <button id="fit" type="button" title="Fit screen / fit width (w)">Fit</button>
+    <span class="group widthbtns">
+      <button id="narrower" type="button" title="Narrower (-)">&minus;</button>
+      <button id="wider" type="button" title="Wider (+)">+</button>
+    </span>
+    <button id="fs" type="button" title="Fullscreen (f)">&#9974;</button>
+  </div>
+  <div class="counter" id="counter"></div>
+</header>
+
+<main class="pages" id="pages"></main>
+<div class="viewer" id="viewer"><img id="page-img" alt=""></div>
+<div class="read-progress" id="progress"></div>
+
+<script src="/static/js/common.js"></script>
+<script src="/static/js/reader.js"></script>
+</body>
+</html>
