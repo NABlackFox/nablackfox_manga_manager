@@ -60,3 +60,13 @@
 }
 .card:hover .name { color: var(--accent); }
 .card .sub { margin-top: 2px; color: var(--dim); font-size: 12px; }
+
+/* one row per author: extra manga are tucked away until "Show more" */
+.card.clipped { display: none; }
+.toggle {
+  display: block; margin: 18px auto 0; height: 36px; padding: 0 22px;
+  background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); border-radius: 99px;
+  font: inherit; font-size: 13px; font-weight: 650; cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.toggle:hover, .toggle:focus-visible { background: var(--accent); color: var(--accent-ink); }

@@ -76,7 +76,17 @@
       el.append(head);
     }
     el.append(grid);
-    return { el, grid, count, cards: [], loaded: false, title: title || "", key: groupKey(title || "") };
+
+    // "Show more" row (authors page only): one row of manga by default
+    const sec = { el, grid, count, cards: [], loaded: false, expanded: false, title: title || "", key: groupKey(title || "") };
+    if (title !== null) {
+      const toggle = document.createElement("button");
+      toggle.type = "button"; toggle.className = "toggle"; toggle.hidden = true;
+      toggle.addEventListener("click", () => { sec.expanded = !sec.expanded; applyCollapse(sec); });
+      el.append(toggle);
+      sec.toggle = toggle;
+    }
+    return sec;
   }
 
   function fillSection(sec, authorName, manga) {
@@ -91,6 +101,29 @@
     $("groups").replaceChildren(...list.map((sec) => sec.el));
     window.scrollTo(0, y);
   }
+
+  // ---------- one row per author, with "Show more" ----------
+  const columnCount = (grid) => getComputedStyle(grid).gridTemplateColumns.split(" ").length;
+
+  function applyCollapse(sec) {
+    if (!sec.toggle || !sec.loaded || sec.el.hidden) return;
+    const filtering = $("search").value.trim() !== "";
+    const matches = sec.cards.filter((c) => !c.hidden);
+    const cols = columnCount(sec.grid);
+    const collapse = !filtering && !sec.expanded;
+    matches.forEach((c, i) => c.classList.toggle("clipped", collapse && i >= cols));
+
+    const extra = matches.length - cols;
+    sec.toggle.hidden = filtering || extra <= 0;      // while filtering, everything that matches is shown
+    sec.toggle.textContent = sec.expanded ? "Show less" : "Show " + extra + " more";
+    sec.toggle.setAttribute("aria-expanded", sec.expanded);
+  }
+
+  let resizeTimer = null;
+  window.addEventListener("resize", () => {           // the number of columns changes with the window
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => sections.forEach(applyCollapse), 120);
+  });
 
   // ---------- filter + counts ----------
   function render() {
@@ -113,6 +146,7 @@
       sec.count.textContent = !sec.loaded ? "loading..." : needle ? visible + " / " + sec.cards.length : sec.cards.length;
       if (visible > 0) letterHasMatch.add(sec.key);
     }
+    sections.forEach(applyCollapse);
     const allLoaded = sections.every((s) => s.loaded);
     for (const [k, link] of letterLinks) link.classList.toggle("off", !letterHasMatch.has(k) && allLoaded);
 
