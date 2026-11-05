@@ -3,4 +3,5 @@ __pycache__/
 .reader_cache/
 reader_progress.json
 webp_converted.json
+bookmarks.json
 manga/

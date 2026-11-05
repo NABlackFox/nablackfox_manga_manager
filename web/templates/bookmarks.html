@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bookmarks</title>
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/library.css">
+</head>
+<body>
+<header class="site-header">
+  {{> brand}}
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <span class="sep">/</span>
+    <span class="here">Bookmarks</span>
+  </nav>
+  <div class="header-tools">
+    <label class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="search" id="search" placeholder="Filter bookmarks" aria-label="Filter" autocomplete="off">
+      <kbd>/</kbd>
+    </label>
+  </div>
+</header>
+
+<main class="page">
+  <div class="page-title">
+    <h1>Bookmarks</h1>
+    <span class="count" id="count"></span>
+  </div>
+  <div class="grid" id="grid"></div>
+  <div class="state" id="empty" hidden>
+    <strong>No bookmarks yet</strong>
+    Click the star on any manga to save it here, so you can find it when you are ready to read it.
+  </div>
+</main>
+
+{{> footer}}
+
+<script src="/static/js/common.js"></script>
+<script src="/static/js/bookmarks.js"></script>
+</body>
+</html>

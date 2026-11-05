@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from terminal.utils import list_images, list_subfolders
-from web import progress
+from web import bookmarks, progress
 from web.library import (
     author_thumb_source, find_author, find_manga, manga_thumb_source, scan_pages,
 )
@@ -30,6 +30,7 @@ PAGES = {
     "/": "library.html",
     "/author": "library.html",
     "/manga": "manga.html",
+    "/bookmarks": "bookmarks.html",
     "/read": "reader.html",
 }
 
@@ -85,6 +86,8 @@ def make_handler(manga_root):
           self._json(self._library())
         elif url.path == "/api/author":
           self._json(self._author(author))
+        elif url.path == "/api/bookmarks":
+          self._json(self._bookmarks())
         elif url.path == "/api/manga":
           self._json(self._manga(author, manga))
         elif url.path == "/thumb":
@@ -106,12 +109,15 @@ def make_handler(manga_root):
     def do_POST(self):
       url = urlparse(self.path)
       query = {k: v[0] for k, v in parse_qs(url.query).items()}
-      if url.path != "/api/progress":
+      if url.path not in ("/api/progress", "/api/bookmark"):
         return self._not_found()
       try:
         folder = self._require_manga(query.get("a"), query.get("m"))
         length = int(self.headers.get("Content-Length", 0))
         data = json.loads(self.rfile.read(length))
+        if url.path == "/api/bookmark":
+          bookmarks.set_marked(folder, folder.parent.name, folder.name, bool(data["on"]))
+          return self._send(204, b"", "text/plain", cache=None)
         count = len(scan_pages(folder))
         index = max(0, min(int(data["index"]), count - 1))
         fraction = max(0.0, min(float(data["fraction"]), 1.0))
@@ -145,6 +151,7 @@ def make_handler(manga_root):
       if folder is None:
         raise LookupError
       saved_all = progress.read_all()
+      marked = bookmarks.read_all()
       manga = []
       for item in list_subfolders(folder):
         images = list_images(item)
@@ -155,8 +162,25 @@ def make_handler(manga_root):
             "name": item.name,
             "pages": len(images),
             "read": saved.get("index") + 1 if "index" in saved else 0,
+            "bookmarked": str(item.resolve()) in marked,
         })
       return {"name": folder.name, "manga": manga}
+
+    def _bookmarks(self):
+      saved_all = progress.read_all()
+      items = []
+      for entry in sorted(bookmarks.read_all().values(), key=lambda e: e.get("added", 0), reverse=True):
+        folder = find_manga(manga_root, entry.get("author"), entry.get("manga"))
+        if folder is None:
+          continue  # renamed or deleted since it was bookmarked
+        saved = saved_all.get(str(folder.resolve()), {})
+        items.append({
+            "author": folder.parent.name,
+            "name": folder.name,
+            "pages": len(list_images(folder)),
+            "read": saved.get("index") + 1 if "index" in saved else 0,
+        })
+      return items
 
     def _manga(self, author, manga):
       folder = self._require_manga(author, manga)
@@ -166,6 +190,7 @@ def make_handler(manga_root):
           "title": folder.name,
           "pages": [{"chapter": p["chapter"], "w": p["w"], "h": p["h"]} for p in pages],
           "progress": progress.load(folder),
+          "bookmarked": bookmarks.is_marked(folder),
       }
 
     def _thumb(self, author, manga):

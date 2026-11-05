@@ -253,12 +253,16 @@
       case "p": case "[": $("prev").click(); break;
       case "+": case "=": $("wider").click(); break;
       case "-": case "_": $("narrower").click(); break;
+      case "b": if (bookmark) bookmark.toggle(); break;
       case "f": toggleFullscreen(); break;
       case "h": barLocked = !barLocked; bar.classList.toggle("hidden", barLocked); break;
       default: return;
     }
     e.preventDefault();
   });
+
+  /* ---------- bookmark ---------- */
+  let bookmark = null;
 
   /* ---------- start ---------- */
   applyWidth();
@@ -272,6 +276,7 @@
 
   getJson("/api/manga?" + query).then(async (data) => {
     build(data);
+    bookmark = MM.bindBookmark($("bookmark"), params.get("a"), params.get("m"), !!data.bookmarked);
     const saved = data.progress || {};
     // ?p=N (from the manga page) wins over the saved position
     const wanted = parseInt(params.get("p"), 10);

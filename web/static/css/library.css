@@ -34,14 +34,15 @@
 @media (max-width: 480px) { .grid { grid-template-columns: repeat(2, 1fr); gap: 18px 12px; } }
 
 /* manga card */
-.card { display: block; color: inherit; text-decoration: none; }
-.card:focus-visible { outline: none; }
+.card { position: relative; }
+.card-link { display: block; color: inherit; text-decoration: none; }
+.card-link:focus-visible { outline: none; }
 .cover {
   position: relative; aspect-ratio: 2 / 3; overflow: hidden;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
   transition: transform .2s var(--ease), border-color .2s, box-shadow .2s;
 }
-.card:hover .cover, .card:focus-visible .cover {
+.card:hover .cover, .card-link:focus-visible .cover {
   transform: translateY(-4px); border-color: var(--accent); box-shadow: var(--shadow);
 }
 .cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -60,6 +61,19 @@
 }
 .card:hover .name { color: var(--accent); }
 .card .sub { margin-top: 2px; color: var(--dim); font-size: 12px; }
+
+/* bookmark star on top of a cover: shows on hover, always when bookmarked or on touch screens */
+.bm {
+  position: absolute; top: 8px; right: 8px; z-index: 2;
+  display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  background: var(--glass); color: var(--ink); border: 1px solid var(--line); border-radius: 50%;
+  cursor: pointer; opacity: 0; transition: opacity .15s, border-color .15s, color .15s;
+}
+.card:hover .bm, .bm:focus-visible, .bm.on { opacity: 1; }
+.bm:hover { border-color: var(--accent); color: var(--accent); }
+.bm.on { border-color: var(--accent); }
+@media (hover: none) { .bm { opacity: 1; } }
+.card.unmarked .card-link { opacity: .45; }
 
 /* one row per author: extra manga are tucked away until "Show more" */
 .card.clipped { display: none; }

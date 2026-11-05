@@ -4,48 +4,17 @@
   const author = params.get("a");
 
   // ---------- cards ----------
-  function card({ href, thumb, name, sub, progress }) {
-    const a = document.createElement("a");
-    a.className = "card"; a.href = href;
-    a.dataset.name = name.toLowerCase();
-
-    const cover = document.createElement("div");
-    cover.className = "cover";
-    const initial = document.createElement("div");
-    initial.className = "initial";
-    initial.textContent = (name.trim()[0] || "?").toUpperCase();
-    cover.appendChild(initial);
-    if (thumb) {
-      const img = document.createElement("img");
-      img.loading = "lazy"; img.alt = ""; img.src = thumb;
-      img.onload = () => initial.remove();
-      img.onerror = () => img.remove();
-      cover.appendChild(img);
-    }
-    if (progress > 0) {
-      const bar = document.createElement("div");
-      bar.className = "progress"; bar.style.width = Math.min(progress, 1) * 100 + "%";
-      cover.appendChild(bar);
-    }
-    a.appendChild(cover);
-
-    const title = document.createElement("div");
-    title.className = "name"; title.textContent = name; title.title = name;
-    a.appendChild(title);
-    if (sub) {
-      const s = document.createElement("div");
-      s.className = "sub"; s.textContent = sub;
-      a.appendChild(s);
-    }
-    return a;
-  }
-
-  const mangaCards = (authorName, manga) => manga.map((m) => card({
-    href: "/manga?" + MM.mangaQuery(authorName, m.name),
-    thumb: "/thumb?" + MM.mangaQuery(authorName, m.name),
+  const mangaCards = (authorName, manga) => manga.map((m) => MM.card({
+    author: authorName,
+    manga: m.name,
     name: m.name,
     sub: m.pages + " pages" + (m.read ? " · page " + m.read : ""),
     progress: m.read / m.pages,
+    bookmarked: m.bookmarked,
+    onBookmark: (on) => {            // keep the cached library in step, so a reload shows the right star
+      m.bookmarked = on;
+      if (shownData) writeCache(shownData);
+    },
   }));
 
   // ---------- sections ----------
@@ -167,7 +136,7 @@
   // Library data is cached in localStorage and shown instantly; a fresh copy is fetched in
   // the background and the page is only rebuilt if something changed (e.g. reading progress).
   // The scroll position is remembered per tab in sessionStorage.
-  const CACHE_KEY = "library-cache-v1";
+  const CACHE_KEY = "library-cache-v2";
   const SCROLL_KEY = "scroll:" + location.pathname + location.search;
 
   function readCache() {
