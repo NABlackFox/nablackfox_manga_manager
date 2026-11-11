@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from terminal.utils import list_images, list_subfolders
+from terminal.shared.utils import list_images, list_subfolders
 from web import bookmarks, progress
 from web.library import (
     author_thumb_source, find_author, find_manga, manga_thumb_source, scan_pages,

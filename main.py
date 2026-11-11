@@ -1,10 +1,10 @@
 import sys
 
 from config import MANGA_ROOT
-from terminal.utils import RED, RESET, clear_screen, enable_ansi, print_header
-from terminal.pages.author_menu import ask_for_author, run_author_menu
-from terminal.pages.admin_menu import run_admin_menu
-from terminal.pages.read_page import run_read_mode
+from terminal.shared.utils import RED, RESET, clear_screen, enable_ansi, print_header
+from terminal.author_menu.author_menu import ask_for_author, run_author_menu
+from terminal.admin_menu.admin_menu import run_admin_menu
+from terminal.read_page.read_page import run_read_mode
 
 
 def main():

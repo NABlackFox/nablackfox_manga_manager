@@ -2,8 +2,8 @@
 import threading
 from pathlib import Path
 
-from terminal.functions.convert_to_webp import find_first_image
-from terminal.utils import list_images, list_subfolders, parse_page
+from terminal.convert_to_webp.convert_to_webp import find_first_image
+from terminal.shared.utils import list_images, list_subfolders, parse_page
 
 try:
   from PIL import Image
