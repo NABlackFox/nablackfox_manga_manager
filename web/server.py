@@ -12,15 +12,27 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from terminal.shared.utils import list_images, list_subfolders
-from web import bookmarks, progress
-from web.library import (
+from web.bookmarks import bookmarks
+from web.reader import progress
+from web.library.library import (
     author_thumb_source, find_author, find_manga, manga_thumb_source, scan_pages,
 )
-from web.thumbs import make_thumb
+from web.library.thumbs import make_thumb
+from web.reader import progress
 
 WEB_FOLDER = Path(__file__).resolve().parent
-TEMPLATES = WEB_FOLDER / "templates"
-STATIC = WEB_FOLDER / "static"
+DOMAINS = ("shared", "library", "reader", "bookmarks")
+TEMPLATE_ROOTS = [WEB_FOLDER / d / "templates" for d in DOMAINS]
+STATIC_ROOTS = [WEB_FOLDER / d / "static" for d in DOMAINS]
+
+
+def _find(roots, relative):
+  """First domain folder that has this file (and the path stays inside that folder)."""
+  for root in roots:
+    file = (root / relative).resolve()
+    if root.resolve() in file.parents and file.is_file():
+      return file
+  raise LookupError
 
 # {{> name}} in a template is replaced by templates/partials/name.html
 INCLUDE = re.compile(r"\{\{>\s*([\w-]+)\s*\}\}")
@@ -58,14 +70,15 @@ def make_handler(manga_root):
       self._send(404, b"Not found", "text/plain")
 
     def _template(self, name):
-      html = (TEMPLATES / name).read_text(encoding="utf-8")
-      html = INCLUDE.sub(lambda m: (TEMPLATES / "partials" / f"{m.group(1)}.html").read_text(encoding="utf-8"), html)
+      html = _find(TEMPLATE_ROOTS, name).read_text(encoding="utf-8")
+      html = INCLUDE.sub(
+          lambda m: _find(TEMPLATE_ROOTS, f"partials/{m.group(1)}.html").read_text(encoding="utf-8"),
+          html,
+      )
       self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
 
     def _static(self, relative):
-      file = (STATIC / relative).resolve()
-      if STATIC.resolve() not in file.parents or not file.is_file():
-        raise LookupError
+      file = _find(STATIC_ROOTS, relative)
       kind = mimetypes.guess_type(file.name)[0] or "application/octet-stream"
       if kind.startswith("text/") or kind == "application/javascript":
         kind += "; charset=utf-8"
