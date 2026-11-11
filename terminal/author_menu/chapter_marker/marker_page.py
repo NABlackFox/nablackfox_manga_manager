@@ -1,12 +1,12 @@
 from terminal.shared.utils import (
     BOLD, CYAN, RED, RESET, list_subfolders
 )
-import terminal.chapter_marker.chapter_marker as chapter_marker
-import terminal.shared.merged_folder as merged_folder
+import terminal.author_menu.chapter_marker.chapter_marker as chapter_marker
+import terminal.author_menu.shared.merged_folder as merged_folder
 from terminal.shared.prompts import (
     ask_single_folder, ask_number, message_screen, read_confirm, pause
 )
-from terminal.shared.screens import show_chapters
+from terminal.author_menu.shared.screens import show_chapters
 
 TITLE = "Edit chapter marker"
 

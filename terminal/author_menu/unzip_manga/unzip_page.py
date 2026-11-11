@@ -1,6 +1,6 @@
 from terminal.shared.utils import BOLD, DIM, GREEN, RED, RESET, clear_screen, print_header
 from terminal.shared.prompts import read_confirm, pause
-import terminal.unzip_manga.unzip_manga as unzip_manga
+import terminal.author_menu.unzip_manga.unzip_manga as unzip_manga
 
 def ask_continue(zips):
   print(f"  {BOLD}Ready to unzip{RESET}\n")

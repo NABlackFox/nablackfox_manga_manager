@@ -1,5 +1,5 @@
 from terminal.shared.utils import list_images, parse_page, page_name
-from terminal.shared.splice import recycle
+from terminal.author_menu.shared.splice import recycle
 
 STAGING_NAME = ".delete_pages_staging"
 

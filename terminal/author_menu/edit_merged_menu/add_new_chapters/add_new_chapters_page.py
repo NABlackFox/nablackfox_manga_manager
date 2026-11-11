@@ -1,9 +1,9 @@
 from terminal.shared.utils import BOLD, DIM, GREEN, RESET, clear_screen, print_header, print_title
-import terminal.add_new_chapters.add_new_chapters as add_new_chapters
-import terminal.shared.merge_manga as merge_manga
-import terminal.shared.merged_folder as merged_folder
+import terminal.author_menu.edit_merged_menu.add_new_chapters.add_new_chapters as add_new_chapters
+import terminal.author_menu.shared.merge_manga as merge_manga
+import terminal.author_menu.shared.merged_folder as merged_folder
 from terminal.shared.prompts import ask_merge_order, message_screen
-from terminal.shared.screens import (
+from terminal.author_menu.shared.screens import (
     load_merged_folder, print_new_chapters, print_totals, print_folder_name,
     confirm_change, apply_and_finish
 )

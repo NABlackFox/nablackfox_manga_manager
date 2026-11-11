@@ -6,8 +6,8 @@ from terminal.shared.utils import (
 from terminal.shared.prompts import (
     ask_single_folder, ask_merge_order, read_confirm, message_screen, pause,
 )
-import terminal.delete_page.delete_pages as delete_pages
-import terminal.shared.merged_folder as merged_folder
+import terminal.author_menu.delete_page.delete_pages as delete_pages
+import terminal.author_menu.shared.merged_folder as merged_folder
 
 TITLE = "Delete pages"
 

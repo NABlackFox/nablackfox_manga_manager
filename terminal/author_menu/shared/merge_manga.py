@@ -2,7 +2,7 @@ import re
 import shutil
 from send2trash import send2trash
 from terminal.shared.utils import list_images, page_name
-from terminal.shared.chapter_ranges import mark_new_pages
+from terminal.author_menu.shared.chapter_ranges import mark_new_pages
 
 def build_merged_name(first_name, chapter_count):
   """Build output folder name from the first chapter's folder name."""

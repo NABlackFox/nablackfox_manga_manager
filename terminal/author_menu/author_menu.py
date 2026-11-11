@@ -6,11 +6,11 @@ from terminal.shared.utils import (
     clear_screen, print_header, group_key, natural_key
 )
 from terminal.shared.prompts import read_menu_choice
-from terminal.unzip_manga.unzip_page import run_unzip
-from terminal.merge_page.merge_page import run_merge
-from terminal.edit_merged_menu.edit_merged_menu import run_edit_merged_menu
-from terminal.chapter_marker.marker_page import run_markers
-from terminal.delete_page.delete_page import run_delete_pages
+from terminal.author_menu.unzip_manga.unzip_page import run_unzip
+from terminal.author_menu.merge_page.merge_page import run_merge
+from terminal.author_menu.edit_merged_menu.edit_merged_menu import run_edit_merged_menu
+from terminal.author_menu.chapter_marker.marker_page import run_markers
+from terminal.author_menu.delete_page.delete_page import run_delete_pages
 
 FUNCTIONS = {
     "1": "Unzip manga",

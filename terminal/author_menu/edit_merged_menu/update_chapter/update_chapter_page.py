@@ -2,9 +2,9 @@ from terminal.shared.utils import (
     BOLD, CYAN, DIM, GREEN, RED, RESET,
     clear_screen, print_header, print_title, list_images
 )
-import terminal.update_chapter.update_chapter as update_chapter
+import terminal.author_menu.edit_merged_menu.update_chapter.update_chapter as update_chapter
 from terminal.shared.prompts import ask_single_folder, ask_number, message_screen
-from terminal.shared.screens import (
+from terminal.author_menu.shared.screens import (
     load_merged_folder, show_chapters, print_shift, print_totals,
     confirm_change, apply_and_finish
 )

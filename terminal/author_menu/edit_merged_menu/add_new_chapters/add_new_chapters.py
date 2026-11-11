@@ -1,6 +1,6 @@
-import terminal.shared.chapter_ranges as chapter_ranges
-import terminal.shared.merged_folder as merged_folder
-import terminal.shared.splice as splice
+import terminal.author_menu.shared.chapter_ranges as chapter_ranges
+import terminal.author_menu.shared.merged_folder as merged_folder
+import terminal.author_menu.shared.splice as splice
 
 def build_add_new_plan(info, folder, file_plan):
   """Plan for adding new chapter folders after the last page.

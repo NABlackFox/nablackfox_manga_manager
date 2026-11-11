@@ -1,5 +1,5 @@
-import terminal.shared.chapter_ranges as chapter_ranges
-import terminal.shared.splice as splice
+import terminal.author_menu.shared.chapter_ranges as chapter_ranges
+import terminal.author_menu.shared.splice as splice
 
 def parse_chapter(text, count, pages, markers):
   """Turn the typed chapter number into (chapter, (first page, last page))."""

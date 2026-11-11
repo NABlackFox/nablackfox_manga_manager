@@ -2,7 +2,7 @@ from terminal.shared.utils import (
     BOLD, CYAN, DIM, GREEN, RED, YELLOW, RESET,
     clear_screen, print_header, print_title, list_subfolders, is_inside
 )
-import terminal.shared.merge_manga as merge_manga
+import terminal.author_menu.shared.merge_manga as merge_manga
 from terminal.shared.prompts import ask_merge_order, message_screen, read_confirm, pause
 
 TITLE = "Merge manga"

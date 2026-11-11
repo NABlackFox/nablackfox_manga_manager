@@ -1,8 +1,8 @@
 from terminal.shared.utils import DIM, YELLOW, RESET, clear_screen, print_header, print_title
 from terminal.shared.prompts import read_menu_choice
-from terminal.add_new_chapters.add_new_chapters_page import run_add_new_chapters
-from terminal.add_missing_chapter.add_missing_chapter_page import run_add_missing_chapter
-from terminal.update_chapter.update_chapter_page import run_update_chapter
+from terminal.author_menu.edit_merged_menu.add_new_chapters.add_new_chapters_page import run_add_new_chapters
+from terminal.author_menu.edit_merged_menu.add_missing_chapter.add_missing_chapter_page import run_add_missing_chapter
+from terminal.author_menu.edit_merged_menu.update_chapter.update_chapter_page import run_update_chapter
 
 # key: (name, description, function)
 OPTIONS = {

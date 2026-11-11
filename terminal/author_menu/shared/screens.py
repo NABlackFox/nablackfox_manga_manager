@@ -2,8 +2,8 @@ from terminal.shared.utils import (
     BOLD, CYAN, DIM, GREEN, RED, YELLOW, RESET,
     clear_screen, print_header, print_title, list_subfolders, list_images
 )
-import terminal.shared.merged_folder as merged_folder
-import terminal.shared.splice as splice
+import terminal.author_menu.shared.merged_folder as merged_folder
+import terminal.author_menu.shared.splice as splice
 from terminal.shared.prompts import (
     ask_single_folder, message_screen, read_confirm, pause
 )
