@@ -1,7 +1,7 @@
 from terminal.shared.prompts import read_menu_choice
-from terminal.convert_to_webp.convert_to_webp import convert_to_webp
-from terminal.grab_zip_files.grab_zip_files import grab_zip_files
-from terminal.grab_zip_manual.grab_zip_manual import grab_zip_manual
+from terminal.admin_menu.convert_to_webp.convert_to_webp import convert_to_webp
+from terminal.admin_menu.grab_zip_files.grab_zip_files import grab_zip_files
+from terminal.admin_menu.grab_zip_manual.grab_zip_manual import grab_zip_manual
 
 from terminal.shared.utils import (
     BOLD, DIM, YELLOW, RESET,

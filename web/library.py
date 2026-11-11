@@ -2,7 +2,7 @@
 import threading
 from pathlib import Path
 
-from terminal.convert_to_webp.convert_to_webp import find_first_image
+from terminal.admin_menu.convert_to_webp.convert_to_webp import find_first_image
 from terminal.shared.utils import list_images, list_subfolders, parse_page
 
 try:

@@ -1,7 +1,7 @@
 import shutil
 from pathlib import Path
 
-from terminal.grab_zip_files.grab_zip_files import ZIP_SOURCE_FOLDER
+from terminal.admin_menu.grab_zip_files.grab_zip_files import ZIP_SOURCE_FOLDER
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.key_binding import KeyBindings
