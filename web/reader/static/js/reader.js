@@ -123,6 +123,7 @@
     current = pos.index;
     $("counter").textContent = (current + 1) + " / " + pages.length;
     select.value = chapterOf(current);
+    if (bookmark) bookmark.refresh();
     const max = document.documentElement.scrollHeight - window.innerHeight;
     $("progress").style.width = (max > 0 ? (window.scrollY / max) * 100 : 0) + "%";
 
@@ -177,6 +178,7 @@
 
     $("counter").textContent = (i + 1) + " / " + pages.length;
     select.value = chapterOf(i);
+    if (bookmark) bookmark.refresh();
     $("progress").style.width = ((i + 1) / pages.length) * 100 + "%";
     document.title = $("title").textContent + " · " + (i + 1) + "/" + pages.length;
 
@@ -276,7 +278,7 @@
 
   getJson("/api/manga?" + query).then(async (data) => {
     build(data);
-    bookmark = MM.bindBookmark($("bookmark"), params.get("a"), params.get("m"), !!data.bookmarked);
+    bookmark = MM.bindBookmark($("bookmark"), params.get("a"), params.get("m"), data.bookmarked, null, () => current);
     const saved = data.progress || {};
     // ?p=N (from the manga page) wins over the saved position
     const wanted = parseInt(params.get("p"), 10);

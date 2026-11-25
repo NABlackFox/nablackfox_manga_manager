@@ -61,6 +61,7 @@
 }
 .card:hover .name { color: var(--accent); }
 .card .sub { margin-top: 2px; color: var(--dim); font-size: 12px; }
+.card .mark-note { margin-top: 2px; color: var(--accent); font-size: 12px; }
 
 /* bookmark star on top of a cover: shows on hover, always when bookmarked or on touch screens */
 .bm {

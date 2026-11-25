@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from terminal.shared.utils import list_images, list_subfolders
+from terminal.shared.utils import list_images, list_subfolders, parse_page
 from web.bookmarks import bookmarks
 from web.reader import progress
 from web.library.library import (
@@ -24,6 +24,30 @@ WEB_FOLDER = Path(__file__).resolve().parent
 DOMAINS = ("shared", "library", "reader", "bookmarks")
 TEMPLATE_ROOTS = [WEB_FOLDER / d / "templates" for d in DOMAINS]
 STATIC_ROOTS = [WEB_FOLDER / d / "static" for d in DOMAINS]
+
+
+def _chapters(folder):
+  """Chapter number of every page (None when it does not start one), read from file names only.
+
+  scan_pages() also opens every image to get its size, which is far too slow to run for each
+  bookmark on every page load. Chapters live in the file names, so this just lists the folder.
+  """
+  return [(parse_page(f) or (None, None))[1] for f in list_images(folder)]
+
+
+def _first_chapter_index(chapters):
+  """Index of the first page that starts a chapter (0 when the manga has no chapter markers)."""
+  return next((i for i, chapter in enumerate(chapters) if chapter), 0)
+
+
+def _bookmark_info(folder, entry):
+  """{"page": 1-based page, "chapter": chapter that page belongs to or None} for a bookmark entry."""
+  chapters = _chapters(folder)
+  index = entry.get("page")
+  index = _first_chapter_index(chapters) if not isinstance(index, int) else index  # old whole-manga bookmark
+  index = max(0, min(index, len(chapters) - 1))
+  chapter = next((c for c in reversed(chapters[:index + 1]) if c), None)
+  return {"page": index + 1, "chapter": chapter}
 
 
 def _find(roots, relative):
@@ -129,8 +153,16 @@ def make_handler(manga_root):
         length = int(self.headers.get("Content-Length", 0))
         data = json.loads(self.rfile.read(length))
         if url.path == "/api/bookmark":
-          bookmarks.set_marked(folder, folder.parent.name, folder.name, bool(data["on"]))
-          return self._send(204, b"", "text/plain", cache=None)
+          if not data["on"]:
+            bookmarks.set_marked(folder, folder.parent.name, folder.name, False)
+            return self._json(None)
+          chapters = _chapters(folder)
+          if data.get("index") is None:
+            index = _first_chapter_index(chapters)    # bookmarked from the library: first chapter
+          else:
+            index = max(0, min(int(data["index"]), len(chapters) - 1))
+          bookmarks.set_marked(folder, folder.parent.name, folder.name, True, index)
+          return self._json(_bookmark_info(folder, {"page": index}))
         count = len(scan_pages(folder))
         index = max(0, min(int(data["index"]), count - 1))
         fraction = max(0.0, min(float(data["fraction"]), 1.0))
@@ -175,7 +207,7 @@ def make_handler(manga_root):
             "name": item.name,
             "pages": len(images),
             "read": saved.get("index") + 1 if "index" in saved else 0,
-            "bookmarked": str(item.resolve()) in marked,
+            "bookmarked": _bookmark_info(item, marked[str(item.resolve())]) if str(item.resolve()) in marked else None,
         })
       return {"name": folder.name, "manga": manga}
 
@@ -192,6 +224,7 @@ def make_handler(manga_root):
             "name": folder.name,
             "pages": len(list_images(folder)),
             "read": saved.get("index") + 1 if "index" in saved else 0,
+            "bookmarked": _bookmark_info(folder, entry),
         })
       return items
 
@@ -203,7 +236,7 @@ def make_handler(manga_root):
           "title": folder.name,
           "pages": [{"chapter": p["chapter"], "w": p["w"], "h": p["h"]} for p in pages],
           "progress": progress.load(folder),
-          "bookmarked": bookmarks.is_marked(folder),
+          "bookmarked": (_bookmark_info(folder, entry) if (entry := bookmarks.get(folder)) else None),
       }
 
     def _thumb(self, author, manga):

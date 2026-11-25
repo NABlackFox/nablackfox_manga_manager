@@ -128,6 +128,7 @@ a { color: inherit; }
 /* bookmark star (outline when off, filled amber when on) */
 .bm-icon { display: block; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
 .on > .bm-icon { fill: var(--accent); stroke: var(--accent); }
+.elsewhere > .bm-icon { stroke: var(--accent); }   /* bookmarked, but on another page */
 .btn.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 
 /* ---------- main + footer ---------- */

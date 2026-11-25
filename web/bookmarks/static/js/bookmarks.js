@@ -16,7 +16,7 @@
       name: m.name,
       sub: m.author + " · " + m.pages + " pages" + (m.read ? " · page " + m.read : ""),
       progress: m.read / m.pages,
-      bookmarked: true,
+      bookmarked: m.bookmarked,
       onBookmark: updateCount,       // un-starred cards stay (dimmed) until you reload, so a slip can be undone
     }));
     $("grid").replaceChildren(...cards);

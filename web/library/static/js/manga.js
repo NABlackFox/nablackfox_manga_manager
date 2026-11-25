@@ -98,7 +98,7 @@
       read.href = readUrl(1);
     }
 
-    MM.bindBookmark($("bookmark"), author, manga, !!data.bookmarked);
+    MM.bindBookmark($("bookmark"), author, manga, data.bookmarked);
 
     $("hero").hidden = false;
     $("pages-section").hidden = false;

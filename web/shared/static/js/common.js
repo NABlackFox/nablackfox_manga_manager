@@ -38,30 +38,59 @@ window.MM = (() => {
     } catch (_) {}
   }
 
-  // Make a button toggle the bookmark of one manga. Updates at once, undoes itself if the save fails.
-  function bindBookmark(btn, author, manga, on, onChange) {
+  // "Chapter 3 · page 45" for a bookmark {page, chapter}
+  function markText(mark) {
+    if (!mark) return "";
+    const parts = [];
+    if (mark.chapter) parts.push("Chapter " + mark.chapter);
+    if (mark.page) parts.push("page " + mark.page);
+    return parts.join(" · ") || "Bookmarked";
+  }
+
+  // Make a button control the bookmark of one manga. `mark` is the current bookmark {page, chapter} or null.
+  // Without getIndex (library, manga page) a click adds the bookmark (the server picks the first chapter) or removes it.
+  // With getIndex (reader) it marks the page you are on: click again there to remove it, click on another page to move it.
+  // Updates at once, undoes itself if the save fails. onChange gets the new bookmark (or null).
+  function bindBookmark(btn, author, manga, mark, onChange, getIndex) {
+    if (mark === true) mark = { page: 0, chapter: null };   // stale cached data from before page bookmarks
+    mark = mark || null;
+    let busy = false;
+    const isHere = () => !!mark && (!getIndex || mark.page === getIndex() + 1);
     const paint = () => {
-      btn.classList.toggle("on", on);
-      btn.setAttribute("aria-pressed", on);
-      btn.title = on ? "Remove bookmark" : "Bookmark (read later)";
+      const here = isHere();
+      btn.classList.toggle("on", here);
+      btn.classList.toggle("elsewhere", !!mark && !here);
+      btn.setAttribute("aria-pressed", here);
+      const text = markText(mark);
+      btn.title = !mark ? (getIndex ? "Bookmark this page (b)" : "Bookmark (read later)")
+        : here ? "Bookmarked: " + text + " (click to remove)"
+        : "Bookmarked: " + text + " (click to move it to this page)";
       const label = btn.querySelector(".label");
-      if (label) label.textContent = on ? "Bookmarked" : "Bookmark";
+      if (label) label.textContent = mark ? "Bookmarked · " + text : "Bookmark";
     };
     paint();
     btn.addEventListener("click", async (e) => {
       e.preventDefault(); e.stopPropagation();   // a card is a link: don't open it
-      const next = !on;
-      on = next; paint();
+      if (busy) return;
+      busy = true;
+      const before = mark;
+      const remove = isHere();
+      const index = getIndex ? getIndex() : undefined;
+      mark = remove ? null : { page: index === undefined ? 0 : index + 1, chapter: null }; paint();
       try {
         const res = await fetch("/api/bookmark?" + mangaQuery(author, manga), {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ on: next }),
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(remove ? { on: false } : { on: true, index }),
         });
         if (!res.ok) throw new Error();
-        if (onChange) onChange(next);
+        mark = remove ? null : await res.json();   // the server says which page / chapter it really marked
+        paint();
+        if (onChange) onChange(mark);
         refreshBookmarkCount();
-      } catch (_) { on = !next; paint(); }
+      } catch (_) { mark = before; paint(); }
+      busy = false;
     });
-    return { set(value) { on = value; paint(); }, toggle() { btn.click(); } };
+    return { set(value) { mark = value || null; paint(); }, refresh: paint, toggle() { btn.click(); } };
   }
 
   // ---------- manga card (library + bookmarks page) ----------
@@ -100,13 +129,23 @@ window.MM = (() => {
       s.className = "sub"; s.textContent = sub;
       a.appendChild(s);
     }
+    const note = document.createElement("div");
+    note.className = "mark-note";
+    a.appendChild(note);
     box.appendChild(a);
 
     // the star sits on top of the cover, next to the link (not inside it)
     const star = document.createElement("button");
     star.type = "button"; star.className = "bm"; star.innerHTML = STAR;
     box.appendChild(star);
-    bindBookmark(star, author, manga, !!bookmarked, (on) => { box.classList.toggle("unmarked", !on); if (onBookmark) onBookmark(on); });
+    const showMark = (mark) => { note.textContent = mark ? "★ " + markText(mark) : ""; note.hidden = !mark; };
+    const initial_mark = bookmarked === true ? { page: 0, chapter: null } : bookmarked || null;
+    showMark(initial_mark);
+    bindBookmark(star, author, manga, initial_mark, (mark) => {
+      showMark(mark);
+      box.classList.toggle("unmarked", !mark);
+      if (onBookmark) onBookmark(mark);
+    });
     return box;
   }
 

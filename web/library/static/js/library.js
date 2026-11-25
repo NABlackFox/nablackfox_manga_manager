@@ -11,8 +11,8 @@
     sub: m.pages + " pages" + (m.read ? " · page " + m.read : ""),
     progress: m.read / m.pages,
     bookmarked: m.bookmarked,
-    onBookmark: (on) => {            // keep the cached library in step, so a reload shows the right star
-      m.bookmarked = on;
+    onBookmark: (mark) => {          // keep the cached library in step, so a reload shows the right star
+      m.bookmarked = mark;
       if (shownData) writeCache(shownData);
     },
   }));
