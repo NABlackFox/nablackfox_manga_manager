@@ -6,8 +6,8 @@ import os
 import shutil
 
 from terminal.shared.utils import (
-    IMAGE_EXTENSIONS, GREEN, YELLOW, RED, DIM, RESET,
-    list_subfolders, natural_key,
+    IMAGE_EXTENSIONS, PAGE_RE, GREEN, YELLOW, RED, DIM, RESET,
+    list_subfolders, natural_key, page_name,
 )
 
 
@@ -15,6 +15,9 @@ TARGET_EXT = ".webp"
 WEBP_QUALITY = 80          # 90 = visually identical, still much smaller than jpg/png
 TEMP_TAG = ".__webp_tmp__"  # marks half-written files so they can be cleaned up
 BAR_WIDTH = 20             # width of the progress bar, in characters
+RENAME_TAG = ".__rename_tmp__"  # temporary names used while renumbering pages
+MIN_DIGITS = 3             # pages are named 001, 002, ... (more digits only for 1000+ pages)
+MARKER_VERSION = 2         # bump it to make every folder be checked again
 
 # Remembers which chapter folders are already fully converted.
 MARKER_FILE = PROJECT_ROOT / "webp_converted.json"
@@ -65,7 +68,7 @@ def find_first_image(chapter_folder):
 
 # ---------- converted-folder markers ----------
 # webp_converted.json looks like:
-#   {"root": "D:/manga", "folders": {"AuthorA/Chapter 1": {"mtime": 1730000000000000000}}}
+#   {"version": 2, "root": "D:/manga", "folders": {"AuthorA/Chapter 1": {"mtime": 1730000000000000000}}}
 # The mtime is the folder's "last changed" stamp taken right after conversion.
 # If pages are added/removed later the stamp changes, so the folder is checked again.
 
@@ -75,8 +78,10 @@ def load_markers(manga_root):
     except (OSError, ValueError):
         return {}
 
-    # Marker file belongs to another library location: start fresh.
-    if not isinstance(data, dict) or data.get("root") != str(manga_root):
+    # Marker file belongs to another library location, or was written before the
+    # renaming step existed (those folders were never checked for names): start fresh.
+    if (not isinstance(data, dict) or data.get("root") != str(manga_root)
+            or data.get("version") != MARKER_VERSION):
         return {}
 
     folders = data.get("folders")
@@ -87,7 +92,7 @@ def save_markers(manga_root, markers):
     temp = MARKER_FILE.with_suffix(".tmp")
     try:
         temp.write_text(
-            json.dumps({"root": str(manga_root), "folders": markers},
+            json.dumps({"version": MARKER_VERSION, "root": str(manga_root), "folders": markers},
                        indent=1, ensure_ascii=False),
             encoding="utf-8",
         )
@@ -162,6 +167,83 @@ def convert_image_to_webp(source):
         return "failed", f"{source.name}: {exc}"
 
 
+# ---------- page names ----------
+
+def names_are_correct(files):
+    """True when every page is named like 001.webp or 001-chapter2.webp, all with the same number of
+    digits (at least 3). So page_1.webp, 1.webp and 01.webp are all wrong; a mix of 001 and 0001 too."""
+    widths = set()
+    for file in files:
+        match = PAGE_RE.match(file.stem)
+        if not match:
+            return False
+        widths.add(len(match.group(1)))
+    return len(widths) <= 1 and min(widths, default=MIN_DIGITS) >= MIN_DIGITS
+
+
+def plan_names(files):
+    """[(file, new path)] that give every page a numbered name (001.webp, 002.webp, ...).
+
+    Nothing to do ([]) when the names are already correct (see names_are_correct).
+    Otherwise the whole folder is numbered in reading order. A chapter marker on a page
+    (-chapter2) is kept on that same page.
+    """
+    if names_are_correct(files):
+        return []
+
+    width = max(MIN_DIGITS, len(str(len(files))))
+    plan = []
+    for number, file in enumerate(files, start=1):
+        match = PAGE_RE.match(file.stem)
+        chapter = int(match.group(2)) if match and match.group(2) else None
+        new_name = page_name(number, width, file.suffix, chapter)
+        if new_name != file.name:
+            plan.append((file, file.with_name(new_name)))
+    return plan
+
+
+def rename_pages(plan):
+    """Do the renames in two steps (old -> temporary -> new) so a new name can never
+    clash with an old one. If anything fails, everything is put back."""
+    staged = []   # (temporary, new, original)
+    placed = []   # (new, temporary): already at the new name
+    try:
+        for i, (source, target) in enumerate(plan):
+            temp = source.with_name(f"{i:06d}{RENAME_TAG}{source.suffix}")
+            source.rename(temp)
+            staged.append((temp, target, source))
+        for temp, target, _source in staged:
+            if target.exists():
+                raise FileExistsError(f"{target.name} already exists")
+            temp.rename(target)
+            placed.append((target, temp))
+    except BaseException:
+        for target, temp in reversed(placed):
+            try:
+                target.rename(temp)
+            except OSError:
+                pass
+        for temp, _target, source in staged:
+            try:
+                temp.rename(source)
+            except OSError:
+                pass
+        raise
+
+
+def fix_names(folder):
+    """Give the pages of a folder numbered names. Returns (renamed count, error text or None)."""
+    try:
+        files = sorted((f for f in folder.iterdir()
+                        if f.is_file() and f.suffix.lower() in IMAGE_EXTENSIONS), key=natural_key)
+        plan = plan_names(files)
+        if plan:
+            rename_pages(plan)
+        return len(plan), None
+    except OSError as exc:
+        return 0, str(exc)
+
+
 # ---------- terminal output ----------
 
 def fit(text):
@@ -186,20 +268,26 @@ def show_final(color, text):
     print(f"\r\033[K{color}{fit(text)}{RESET}")
 
 
-def convert_folder(folder, label, on_progress=None):
-    """Convert every image directly inside `folder`.
+def convert_folder(folder, label, on_progress=None, rename=True):
+    """Make every image directly inside `folder` a .webp with a numbered name.
 
-    Returns (converted, skipped, failed, issues). `issues` is a list of
+    For each folder, two things in this order:
+      1. type:   images that are not .webp yet are converted (an existing .webp is left alone)
+      2. naming: if the pages are not already named 001.webp, 002.webp, ... they are renamed
+                 (this runs even when every image was already .webp)
+                 (rename=False skips this, used for the images sitting in an author folder)
+
+    Returns (converted, skipped, failed, renamed, issues). `issues` is a list of
     (color, text) lines for the caller to print once the progress bar is done.
     on_progress(done, total) is called before the first image and after each one.
     """
-    converted = skipped = failed = 0
+    converted = skipped = failed = renamed = 0
     issues = []
 
     try:
         files = sorted((f for f in folder.iterdir() if f.is_file()), key=natural_key)
     except OSError as exc:
-        return 0, 0, 1, [(RED, f"    [FAILED] {label}: {exc}")]
+        return 0, 0, 1, 0, [(RED, f"    [FAILED] {label}: {exc}")]
 
     todo = []
     for file in files:
@@ -234,14 +322,22 @@ def convert_folder(folder, label, on_progress=None):
         if on_progress:
             on_progress(number, len(todo))
 
-    return converted, skipped, failed, issues
+    # Step 2: names. Done after the types, so a page that failed to convert is renamed too.
+    if rename:
+        renamed, error = fix_names(folder)
+        if error:
+            issues.append((RED, f"    [FAILED] {label}: could not rename pages ({error}). Nothing was renamed."))
+            failed += 1
+
+    return converted, skipped, failed, renamed, issues
 
 
 def convert_to_webp(manga_root):
-    """Convert every image in the library to .webp, remembering finished folders."""
+    """Convert every image in the library to .webp and give pages numbered names, remembering finished folders."""
     manga_root = Path(manga_root)
 
     converted = skipped = failed = 0
+    renamed = 0
     folders_converted = 0   # folders where work was done
     folders_clean = 0       # folders checked, nothing to convert
     folders_marked = 0      # skipped because a marker says "already converted"
@@ -278,7 +374,7 @@ def convert_to_webp(manga_root):
     try:
         # Images sitting directly in an author folder (the author thumbnail).
         for author in author_folders:
-            c, s, f, issues = convert_folder(author, author.name)
+            c, s, f, _r, issues = convert_folder(author, author.name, rename=False)
             converted += c
             skipped += s
             failed += f
@@ -300,25 +396,26 @@ def convert_to_webp(manga_root):
 
             show_progress(index, total, key, 0, 0)
 
-            c, s, f, issues = convert_folder(
+            c, s, f, r, issues = convert_folder(
                 chapter, key,
                 on_progress=lambda done, count: show_progress(index, total, key, done, count),
             )
             converted += c
             skipped += s
             failed += f
+            renamed += r
 
             if s or f:
                 folders_problem += 1
                 show_final(YELLOW, f"[{index}/{total}] ISSUES  {key}: "
-                                   f"{c} converted, {s} skipped, {f} failed")
+                                   f"{c} converted, {r} renamed, {s} skipped, {f} failed")
                 markers.pop(key, None)  # check again next time
-            elif c:
+            elif c or r:
                 folders_converted += 1
-                show_final(GREEN, f"[{index}/{total}] DONE    {key}: {c} converted")
+                show_final(GREEN, f"[{index}/{total}] DONE    {key}: {c} converted, {r} renamed")
             else:
                 folders_clean += 1
-                show_final(DIM, f"[{index}/{total}] OK      {key}  (nothing to convert)")
+                show_final(DIM, f"[{index}/{total}] OK      {key}  (nothing to change)")
 
             for color, text in issues:
                 print(f"{color}{text}{RESET}")
@@ -331,12 +428,13 @@ def convert_to_webp(manga_root):
         save_markers(manga_root, markers)
 
     print("\n" + "=" * 50)
-    print("WebP conversion summary")
+    print("WebP conversion + naming summary")
     print("=" * 50)
     print(f"{GREEN}Images converted:        {converted}{RESET}")
+    print(f"{GREEN}Images renamed:          {renamed}{RESET}")
     print(f"{YELLOW}Images skipped:          {skipped}{RESET}")
     print(f"{RED}Images failed:           {failed}{RESET}")
-    print(f"Folders converted:       {folders_converted}")
+    print(f"Folders changed:         {folders_converted}")
     print(f"Folders with issues:     {folders_problem}")
     print(f"{DIM}Folders nothing to do:   {folders_clean}{RESET}")
     print(f"{DIM}Folders already marked:  {folders_marked}{RESET}")

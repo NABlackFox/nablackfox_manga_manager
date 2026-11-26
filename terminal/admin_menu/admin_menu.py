@@ -12,7 +12,7 @@ from terminal.shared.utils import (
 FUNCTIONS = {
     "1": "Grab zip file",
     "2": "Grab zip file (manual mode)",
-    "3": "Convert images to WebP",
+    "3": "Convert images to WebP and fix page names",
 }
 
 
