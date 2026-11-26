@@ -266,6 +266,13 @@
   /* ---------- bookmark ---------- */
   let bookmark = null;
 
+  MM.shortcuts([
+    ["← →", "Previous / next page (page mode)"], ["Space", "Next page (Shift: previous)"],
+    ["Home End", "First / last page (page mode)"], ["p n", "Previous / next chapter"],
+    ["b", "Bookmark this page"], ["m", "Page mode / scroll mode"], ["w", "Fit screen / fit width"],
+    ["+ -", "Wider / narrower"], ["f", "Fullscreen"], ["h", "Lock the top bar hidden"],
+  ]);
+
   /* ---------- start ---------- */
   applyWidth();
   paged = store.get("reader-mode") !== "scroll";

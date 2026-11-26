@@ -131,6 +131,24 @@ a { color: inherit; }
 .elsewhere > .bm-icon { stroke: var(--accent); }   /* bookmarked, but on another page */
 .btn.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 
+/* keyboard shortcut overlay (press ?) */
+.help-overlay {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center;
+  background: rgba(0, 0, 0, .6); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+}
+.help-box {
+  width: min(420px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 22px 24px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow);
+}
+.help-box h2 { margin: 0 0 14px; font-size: 16px; }
+.help-box dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0; align-items: center; }
+.help-box dt { display: flex; gap: 4px; flex-wrap: wrap; }
+.help-box dd { margin: 0; color: var(--dim); }
+.help-box kbd {
+  min-width: 24px; padding: 1px 7px; text-align: center; font: 12px var(--font);
+  color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 5px;
+}
+
 /* ---------- main + footer ---------- */
 .page { flex: 1; width: 100%; max-width: var(--page-max); margin: 0 auto; padding: 28px var(--gutter) 56px; }
 .site-footer {

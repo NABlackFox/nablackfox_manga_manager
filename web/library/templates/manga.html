@@ -16,7 +16,14 @@
     <span class="sep">/</span>
     <span class="here" id="crumb-title">Loading...</span>
   </nav>
-  <div class="header-tools">{{> nav}}</div>
+  <div class="header-tools">
+    {{> nav}}
+    <form class="search" action="/" method="get" role="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="search" id="quick-search" name="q" placeholder="Search all manga" aria-label="Search all manga" autocomplete="off">
+      <kbd>/</kbd>
+    </form>
+  </div>
 </header>
 
 <main class="page">
@@ -34,6 +41,7 @@
         <a class="btn" id="read" href="#">Start reading</a>
         <a class="btn ghost" id="restart" href="#" hidden>From the start</a>
         <button class="btn ghost" id="bookmark" type="button"><svg class="bm-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6L3.4 9.8l6-.8z" stroke-linejoin="round"/></svg><span class="label">Bookmark</span></button>
+        <a class="btn ghost" id="goto-mark" href="#" hidden>Go to bookmark</a>
       </div>
     </div>
   </section>

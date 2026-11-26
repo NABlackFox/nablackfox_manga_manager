@@ -98,7 +98,13 @@
       read.href = readUrl(1);
     }
 
-    MM.bindBookmark($("bookmark"), author, manga, data.bookmarked);
+    // "Go to bookmark" opens the reader on the marked page; it follows the bookmark as it changes
+    const showMark = (mark) => {
+      $("goto-mark").hidden = !mark || !mark.page;
+      if (mark && mark.page) $("goto-mark").href = readUrl(mark.page);
+    };
+    showMark(data.bookmarked);
+    MM.bindBookmark($("bookmark"), author, manga, data.bookmarked, showMark);
 
     $("hero").hidden = false;
     $("pages-section").hidden = false;
@@ -106,6 +112,7 @@
     addCards(BATCH);
   }
 
+  MM.shortcuts([["/", "Search all manga"]]);
   $("load10").onclick = () => addCards(BATCH);
   $("load50").onclick = () => addCards(50);
   start().catch(() => {

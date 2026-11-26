@@ -94,14 +94,17 @@ window.MM = (() => {
   }
 
   // ---------- manga card (library + bookmarks page) ----------
-  function card({ author, manga, name, sub, progress, bookmarked, onBookmark }) {
+  // href: where the card opens (default: the manga page).
+  // readAtMark: open the reader at the bookmarked page instead (falls back to the manga page without a bookmark).
+  function card({ author, manga, name, sub, progress, bookmarked, onBookmark, href, readAtMark }) {
     const q = mangaQuery(author, manga);
     const box = document.createElement("div");
     box.className = "card";
     box.dataset.name = name.toLowerCase();
+    box.dataset.status = progress >= 1 ? "done" : progress > 0 ? "reading" : "unread";
 
     const a = document.createElement("a");
-    a.className = "card-link"; a.href = "/manga?" + q;
+    a.className = "card-link"; a.href = href || "/manga?" + q;
 
     const cover = document.createElement("div");
     cover.className = "cover";
@@ -114,6 +117,11 @@ window.MM = (() => {
     img.onload = () => initial.remove();
     img.onerror = () => img.remove();
     cover.appendChild(img);
+    if (progress >= 1) {
+      const done = document.createElement("span");
+      done.className = "badge done"; done.textContent = "Finished";
+      cover.appendChild(done);
+    }
     if (progress > 0) {
       const bar = document.createElement("div");
       bar.className = "progress"; bar.style.width = Math.min(progress, 1) * 100 + "%";
@@ -138,7 +146,10 @@ window.MM = (() => {
     const star = document.createElement("button");
     star.type = "button"; star.className = "bm"; star.innerHTML = STAR;
     box.appendChild(star);
-    const showMark = (mark) => { note.textContent = mark ? "★ " + markText(mark) : ""; note.hidden = !mark; };
+    const showMark = (mark) => {
+      note.textContent = mark ? "★ " + markText(mark) : ""; note.hidden = !mark;
+      if (readAtMark && !href) a.href = mark && mark.page ? "/read?" + q + "&p=" + mark.page : "/manga?" + q;
+    };
     const initial_mark = bookmarked === true ? { page: 0, chapter: null } : bookmarked || null;
     showMark(initial_mark);
     bindBookmark(star, author, manga, initial_mark, (mark) => {
@@ -149,7 +160,49 @@ window.MM = (() => {
     return box;
   }
 
-  document.addEventListener("DOMContentLoaded", refreshBookmarkCount);
+  // ---------- keyboard shortcut list (press ?) ----------
+  // list: [["key", "what it does"], ...]  The page shows it as a small overlay.
+  function shortcuts(list) {
+    let overlay = null;
+    const close = () => { if (overlay) { overlay.remove(); overlay = null; } };
+    const open = () => {
+      overlay = document.createElement("div");
+      overlay.className = "help-overlay";
+      const box = document.createElement("div");
+      box.className = "help-box";
+      const title = document.createElement("h2");
+      title.textContent = "Keyboard shortcuts";
+      const dl = document.createElement("dl");
+      for (const [keys, text] of list.concat([["?", "Show / hide this list"]])) {
+        const dt = document.createElement("dt");
+        keys.split(" ").forEach((k) => { const kbd = document.createElement("kbd"); kbd.textContent = k; dt.appendChild(kbd); });
+        const dd = document.createElement("dd");
+        dd.textContent = text;
+        dl.append(dt, dd);
+      }
+      box.append(title, dl);
+      overlay.appendChild(box);
+      overlay.addEventListener("click", close);
+      document.body.appendChild(overlay);
+    };
+    document.addEventListener("keydown", (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
+      if (e.key === "?") { overlay ? close() : open(); e.preventDefault(); }
+      else if (e.key === "Escape" && overlay) close();
+    });
+  }
 
-  return { $, enc, params, store, mangaQuery, groupKey, getJson, card, bindBookmark, refreshBookmarkCount };
+  document.addEventListener("DOMContentLoaded", () => {
+    refreshBookmarkCount();
+    // pages with a "search all manga" box that jumps to the library: "/" focuses it
+    const quick = $("quick-search");
+    if (quick) document.addEventListener("keydown", (e) => {
+      if (e.key === "/" && document.activeElement !== quick && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); quick.focus(); }
+      else if (e.key === "Escape" && document.activeElement === quick) quick.blur();
+    });
+  });
+
+  return { $, enc, params, store, mangaQuery, groupKey, getJson, card, bindBookmark, refreshBookmarkCount, shortcuts };
 })();

@@ -125,6 +125,8 @@ def make_handler(manga_root):
           self._json(self._author(author))
         elif url.path == "/api/bookmarks":
           self._json(self._bookmarks())
+        elif url.path == "/api/recent":
+          self._json(self._recent())
         elif url.path == "/api/manga":
           self._json(self._manga(author, manga))
         elif url.path == "/thumb":
@@ -226,6 +228,32 @@ def make_handler(manga_root):
             "read": saved.get("index") + 1 if "index" in saved else 0,
             "bookmarked": _bookmark_info(folder, entry),
         })
+      return items
+
+    def _recent(self, limit=12):
+      """Manga you are in the middle of, most recently read first (finished ones are left out)."""
+      marked = bookmarks.read_all()
+      entries = sorted(progress.read_all().items(), key=lambda kv: kv[1].get("time", 0), reverse=True)
+      items = []
+      for key, saved in entries:
+        path = Path(key)
+        folder = find_manga(manga_root, path.parent.name, path.name)
+        if folder is None or "index" not in saved:
+          continue  # renamed or deleted since it was read
+        pages = len(list_images(folder))
+        read = saved["index"] + 1
+        if pages == 0 or read >= pages:
+          continue  # finished
+        mark = marked.get(str(folder.resolve()))
+        items.append({
+            "author": folder.parent.name,
+            "name": folder.name,
+            "pages": pages,
+            "read": read,
+            "bookmarked": _bookmark_info(folder, mark) if mark else None,
+        })
+        if len(items) >= limit:
+          break
       return items
 
     def _manga(self, author, manga):

@@ -3,6 +3,11 @@
   const { $, enc, params, groupKey, getJson } = MM;
   const author = params.get("a");
 
+  // "All" / "Unread" / "In progress" / "Finished": remembered between visits
+  const STATUSES = ["all", "unread", "reading", "done"];
+  let status = STATUSES.includes(MM.store.get("library-status")) ? MM.store.get("library-status") : "all";
+  const isFiltering = () => $("search").value.trim() !== "" || status !== "all";
+
   // ---------- cards ----------
   const mangaCards = (authorName, manga) => manga.map((m) => MM.card({
     author: authorName,
@@ -76,7 +81,7 @@
 
   function applyCollapse(sec) {
     if (!sec.toggle || !sec.loaded || sec.el.hidden) return;
-    const filtering = $("search").value.trim() !== "";
+    const filtering = isFiltering();
     const matches = sec.cards.filter((c) => !c.hidden);
     const cols = columnCount(sec.grid);
     const collapse = !filtering && !sec.expanded;
@@ -94,6 +99,9 @@
     resizeTimer = setTimeout(() => sections.forEach(applyCollapse), 120);
   });
 
+  // the "Continue reading" row is for browsing: hidden while searching or filtering, and when empty
+  const updateRecent = () => { $("recent").hidden = isFiltering() || !$("rail").children.length; };
+
   // ---------- filter + counts ----------
   function render() {
     const needle = $("search").value.trim().toLowerCase();
@@ -105,14 +113,15 @@
       const authorHit = needle && sec.title.toLowerCase().includes(needle);
       let visible = 0;
       for (const c of sec.cards) {
-        const match = !needle || authorHit || c.dataset.name.includes(needle);
+        const match = (!needle || authorHit || c.dataset.name.includes(needle))
+          && (status === "all" || c.dataset.status === status);
         c.hidden = !match;
         if (match) visible++;
       }
       shown += visible;
       total += sec.cards.length;
       sec.el.hidden = sec.loaded && visible === 0;   // empty authors / no match: hide
-      sec.count.textContent = !sec.loaded ? "loading..." : needle ? visible + " / " + sec.cards.length : sec.cards.length;
+      sec.count.textContent = !sec.loaded ? "loading..." : isFiltering() ? visible + " / " + sec.cards.length : sec.cards.length;
       if (visible > 0) letterHasMatch.add(sec.key);
     }
     sections.forEach(applyCollapse);
@@ -120,9 +129,10 @@
     for (const [k, link] of letterLinks) link.classList.toggle("off", !letterHasMatch.has(k) && allLoaded);
 
     const loading = !allLoaded;
-    $("empty").textContent = needle ? "Nothing matches." : "No manga found.";
+    $("empty").textContent = isFiltering() ? "Nothing matches." : "No manga found.";
     $("empty").hidden = shown > 0 || loading;
-    $("count").textContent = (needle ? shown + " / " + total : total) + " manga" + (loading ? " ..." : "");
+    $("count").textContent = (isFiltering() ? shown + " / " + total : total) + " manga" + (loading ? " ..." : "");
+    updateRecent();
   }
 
   let queued = false;
@@ -280,21 +290,70 @@
     restoreScroll();
   }
 
+  // ---------- continue reading ----------
+  // The manga you are in the middle of, newest first. Clicking one resumes at the exact place you stopped.
+  async function loadRecent() {
+    try {
+      const items = await getJson("/api/recent");
+      $("rail").replaceChildren(...items.map((m) => MM.card({
+        author: m.author,
+        manga: m.name,
+        name: m.name,
+        sub: m.author + " · page " + m.read + " / " + m.pages,
+        progress: m.read / m.pages,
+        bookmarked: m.bookmarked,
+        href: "/read?" + MM.mangaQuery(m.author, m.name),
+      })));
+    } catch (_) { $("rail").replaceChildren(); }
+    updateRecent();
+  }
+
   function start() {
     const id = ++runId;
+    if (author === null) loadRecent();
     return author === null ? loadLibrary(id) : loadAuthor(id);
   }
 
+  // ---------- filter chips, random ----------
+  const chips = [...document.querySelectorAll(".chip[data-status]")];
+  function paintChips() { chips.forEach((c) => c.setAttribute("aria-pressed", c.dataset.status === status)); }
+  paintChips();
+  chips.forEach((c) => c.addEventListener("click", () => {
+    status = c.dataset.status;
+    MM.store.set("library-status", status);
+    paintChips();
+    render();
+  }));
+
+  function openRandom() {
+    const pool = sections.filter((s) => !s.el.hidden).flatMap((s) => s.cards.filter((c) => !c.hidden));
+    if (!pool.length) return;
+    location.href = pool[Math.floor(Math.random() * pool.length)].querySelector(".card-link").href;
+  }
+  $("random").addEventListener("click", openRandom);
+
   // ---------- events ----------
+  $("search").value = params.get("q") || "";     // /?q=... comes from the search box on other pages
   $("search").addEventListener("input", render);
+  // Enter with exactly one match opens it
+  $("search").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    const hits = sections.flatMap((s) => s.el.hidden ? [] : s.cards.filter((c) => !c.hidden));
+    if (hits.length === 1) location.href = hits[0].querySelector(".card-link").href;
+  });
   document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName);
     if (e.key === "/" && document.activeElement !== $("search")) { e.preventDefault(); $("search").focus(); }
     else if (e.key === "Escape") { $("search").value = ""; $("search").blur(); render(); }
+    else if (e.key === "r" && !typing) openRandom();
   });
+  MM.shortcuts([["/", "Search manga and authors"], ["Enter", "Open the match (when only one is left)"],
+    ["Esc", "Clear the search"], ["r", "Open a random manga from what is shown"]]);
   // back from the reader: refresh reading progress
   window.addEventListener("pageshow", (e) => {
     if (!e.persisted) return;
-    if (author === null) revalidate(++runId); else start();
+    if (author === null) { loadRecent(); revalidate(++runId); } else start();
   });
 
   start().catch(() => {

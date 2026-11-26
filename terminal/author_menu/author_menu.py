@@ -1,5 +1,6 @@
 import math
 from prompt_toolkit import prompt
+from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.completion import WordCompleter
 from terminal.shared.utils import (
     BOLD, CYAN, DIM, GREEN, RED, YELLOW, RESET,
@@ -86,13 +87,15 @@ def print_author_grid(authors, manga_root):
     print_rows(groups[key], columns, col_width, manga_root)
     print()
 
+BACK = object()   # returned by ask_for_author when Esc is pressed
+
 def show_main_menu(authors, manga_root, error=""):
   clear_screen()
   print_header(manga_root, f"Library: {manga_root}")
   print(f"  {BOLD}Authors{RESET} {DIM}({len(authors)}){RESET}\n")
   print_author_grid(authors, manga_root)
   print()
-  print(f"  {DIM}Type an author name (Tab to auto-complete), or \"read\" for read mode.  Enter on an empty line to refresh.  Ctrl+C to exit.{RESET}\n")
+  print(f"  {DIM}Type an author name (Tab to auto-complete).  Enter on an empty line to refresh.  Esc to go back, Ctrl+C to exit.{RESET}\n")
   if error:
     print(f"  {RED}{error}{RESET}\n")
 
@@ -106,7 +109,14 @@ def ask_for_author(manga_root):
     completer = WordCompleter(authors, ignore_case=True, match_middle=True, sentence=True)
 
     show_main_menu(authors, manga_root, error)
-    text = prompt("  Author > ", completer=completer).strip().strip('"\'')
+    kb = KeyBindings()
+    @kb.add("escape", eager=True)
+    def _back(event):
+      event.app.exit(result=None)
+    text = prompt("  Author > ", completer=completer, key_bindings=kb)
+    if text is None:
+      return BACK
+    text = text.strip().strip('"\'')
     if not text:
       error = ""
       continue

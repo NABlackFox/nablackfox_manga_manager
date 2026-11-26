@@ -1,6 +1,7 @@
 """Remembers where you stopped reading each manga."""
 import json
 import threading
+import time
 
 from config import PROJECT_ROOT
 
@@ -22,7 +23,7 @@ def load(folder):
 def save(folder, index, fraction):
   with _lock:
     data = read_all()
-    data[str(folder.resolve())] = {"index": index, "fraction": fraction}
+    data[str(folder.resolve())] = {"index": index, "fraction": fraction, "time": time.time()}
     try:
       PROGRESS_FILE.write_text(json.dumps(data, indent=1), encoding="utf-8")
     except OSError:

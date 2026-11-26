@@ -27,9 +27,21 @@
 <nav class="jump" id="jump" aria-label="Jump to letter" hidden></nav>
 
 <main class="page">
+  <section class="recent" id="recent" hidden>
+    <h2 class="group-head"><span>Continue reading</span></h2>
+    <div class="rail" id="rail"></div>
+  </section>
+
   <div class="page-title">
     <h1 id="heading">Library</h1>
     <span class="count" id="count"></span>
+    <div class="tools" role="group" aria-label="Show">
+      <button class="chip" type="button" data-status="all" aria-pressed="true">All</button>
+      <button class="chip" type="button" data-status="unread" aria-pressed="false">Unread</button>
+      <button class="chip" type="button" data-status="reading" aria-pressed="false">In progress</button>
+      <button class="chip" type="button" data-status="done" aria-pressed="false">Finished</button>
+      <button class="chip action" type="button" id="random" title="Open a random manga from what is shown (r)">Random</button>
+    </div>
   </div>
   <div id="groups"></div>
   <div class="state" id="empty" hidden></div>
