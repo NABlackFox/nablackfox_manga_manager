@@ -38,7 +38,7 @@
       box.className = "thumb-box loading";
       if (pages[i].w && pages[i].h) box.style.aspectRatio = pages[i].w + " / " + pages[i].h;
       const img = document.createElement("img");
-      img.alt = ""; img.decoding = "async";
+      img.alt = ""; img.decoding = "async"; img.loading = "lazy";   // "Load all" adds hundreds: only fetch what scrolls into view
       img.onload = () => box.classList.remove("loading");
       img.onerror = () => { box.classList.remove("loading"); img.remove(); };
       img.src = "/pthumb?" + query + "&i=" + i;
@@ -60,7 +60,7 @@
 
     $("more").hidden = shown >= pages.length;
     $("hint").textContent = "Showing " + shown + " of " + pages.length + " pages";
-    $("load50").hidden = pages.length - shown <= BATCH;
+    $("loadall").hidden = pages.length - shown <= BATCH;   // with 10 or fewer left, "Load 10 more" already does it
   }
 
   function addFact(html) {
@@ -132,7 +132,7 @@
 
   MM.shortcuts([["/", "Search all manga"]]);
   $("load10").onclick = () => addCards(BATCH);
-  $("load50").onclick = () => addCards(50);
+  $("loadall").onclick = () => addCards(pages.length);
   start().catch(() => {
     $("crumb-title").textContent = "Not found";
     $("msg").innerHTML = "<strong>Could not load this manga</strong>Is read mode still running in the terminal?";
