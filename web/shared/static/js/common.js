@@ -196,6 +196,17 @@ window.MM = (() => {
 
   document.addEventListener("DOMContentLoaded", () => {
     refreshBookmarkCount();
+    // footer: forget the reading position of every manga (bookmarks are kept)
+    const clearAll = $("clear-all");
+    if (clearAll) clearAll.addEventListener("click", async () => {
+      if (!confirm("Clear the reading progress of ALL manga? Bookmarks are kept. This cannot be undone.")) return;
+      try {
+        const res = await fetch("/api/progress/clear-all", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+        if (!res.ok) throw new Error();
+        try { localStorage.removeItem("library-cache-v2"); } catch (_) {}   // the cached library still has the old progress
+        location.reload();
+      } catch (_) { alert("Could not clear. Is read mode still running in the terminal?"); }
+    });
     // pages with a "search all manga" box that jumps to the library: "/" focuses it
     const quick = $("quick-search");
     if (quick) document.addEventListener("keydown", (e) => {

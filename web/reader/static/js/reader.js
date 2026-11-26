@@ -229,7 +229,34 @@
     else document.documentElement.requestFullscreen().catch(() => {});
   }
 
+  // Start a new chapter on the page being read. The server decides the chapter number and checks it is allowed;
+  // we ask first (popup), then reload so the chapter list shows the new marker. Fixing a mistake is a terminal job.
+  let marking = false;
+  async function markChapter() {
+    if (marking) return;
+    marking = true;
+    const index = current;
+    const call = (action) => fetch("/api/chapter/" + action + "?" + query, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ index }),
+    });
+    try {
+      const plan = await call("plan");
+      const body = await plan.json();
+      if (!plan.ok) { alert(body.error || "Could not mark a chapter here."); return; }
+      const ok = confirm("Start a new chapter here?\n\n" + body.lines.map((l) => "• " + l).join("\n")
+        + "\n\nThis renames the page files. A wrong marker can only be fixed from the terminal.");
+      if (!ok) return;
+      const done = await call("mark");
+      const result = await done.json();
+      if (!done.ok) { alert(result.error || "Could not mark the chapter."); return; }
+      location.href = "/read?" + query + "&p=" + (index + 1);
+    } catch (_) {
+      alert("Could not reach the reader. Is read mode still running in the terminal?");
+    } finally { marking = false; }
+  }
+
   select.onchange = () => goToChapter(+select.value);
+  $("mark-chapter").onclick = markChapter;
   $("prev").onclick = () => goToChapter(chapterOf(current) - (isAtChapterStart() ? 1 : 0));
   $("next").onclick = () => goToChapter(chapterOf(current) + 1);
   $("narrower").onclick = () => setWidth(width - WIDTH_STEP);
@@ -256,6 +283,7 @@
       case "+": case "=": $("wider").click(); break;
       case "-": case "_": $("narrower").click(); break;
       case "b": if (bookmark) bookmark.toggle(); break;
+      case "c": markChapter(); break;
       case "f": toggleFullscreen(); break;
       case "h": barLocked = !barLocked; bar.classList.toggle("hidden", barLocked); break;
       default: return;
@@ -269,7 +297,7 @@
   MM.shortcuts([
     ["← →", "Previous / next page (page mode)"], ["Space", "Next page (Shift: previous)"],
     ["Home End", "First / last page (page mode)"], ["p n", "Previous / next chapter"],
-    ["b", "Bookmark this page"], ["m", "Page mode / scroll mode"], ["w", "Fit screen / fit width"],
+    ["b", "Bookmark this page"], ["c", "Start a new chapter on this page"], ["m", "Page mode / scroll mode"], ["w", "Fit screen / fit width"],
     ["+ -", "Wider / narrower"], ["f", "Fullscreen"], ["h", "Lock the top bar hidden"],
   ]);
 

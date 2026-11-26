@@ -20,11 +20,28 @@ def load(folder):
   return read_all().get(str(folder.resolve()), {})
 
 
+def _write(data):
+  try:
+    PROGRESS_FILE.write_text(json.dumps(data, indent=1), encoding="utf-8")
+  except OSError:
+    pass
+
+
 def save(folder, index, fraction):
   with _lock:
     data = read_all()
     data[str(folder.resolve())] = {"index": index, "fraction": fraction, "time": time.time()}
-    try:
-      PROGRESS_FILE.write_text(json.dumps(data, indent=1), encoding="utf-8")
-    except OSError:
-      pass
+    _write(data)
+
+
+def clear(folder):
+  """Forget where you were in one manga (it counts as unread again)."""
+  with _lock:
+    data = read_all()
+    if data.pop(str(folder.resolve()), None) is not None:
+      _write(data)
+
+
+def clear_all():
+  with _lock:
+    _write({})

@@ -30,6 +30,7 @@ body { display: block; } /* the reader is not a flex column like the other pages
 .bar select:hover, .bar button:hover { border-color: var(--accent); }
 .bar select { max-width: 150px; }
 .bar button.on { color: var(--accent); border-color: var(--accent); }
+.bar #mark-chapter { white-space: nowrap; }
 .bar #bookmark { display: grid; place-items: center; width: 34px; padding: 0; }
 
 /* scroll mode */

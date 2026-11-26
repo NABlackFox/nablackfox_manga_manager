@@ -13,7 +13,7 @@ from urllib.parse import parse_qs, urlparse
 
 from terminal.shared.utils import list_images, list_subfolders, parse_page
 from web.bookmarks import bookmarks
-from web.reader import progress
+from web.reader import chapters as chapter_edit, progress
 from web.library.library import (
     author_thumb_source, find_author, find_manga, manga_thumb_source, scan_pages,
 )
@@ -148,12 +148,31 @@ def make_handler(manga_root):
     def do_POST(self):
       url = urlparse(self.path)
       query = {k: v[0] for k, v in parse_qs(url.query).items()}
-      if url.path not in ("/api/progress", "/api/bookmark"):
+      if url.path not in ("/api/progress", "/api/bookmark", "/api/progress/reset", "/api/progress/finish", "/api/progress/clear-all",
+                      "/api/chapter/plan", "/api/chapter/mark"):
         return self._not_found()
       try:
+        if url.path == "/api/progress/clear-all":
+          progress.clear_all()
+          return self._send(204, b"", "text/plain", cache=None)
         folder = self._require_manga(query.get("a"), query.get("m"))
         length = int(self.headers.get("Content-Length", 0))
         data = json.loads(self.rfile.read(length))
+        if url.path in ("/api/chapter/plan", "/api/chapter/mark"):
+          # "plan" only says what would change (for the confirmation popup); "mark" does it
+          try:
+            plan = chapter_edit.plan_new_chapter(folder, int(data["index"]))
+            if url.path == "/api/chapter/mark":
+              chapter_edit.apply(plan)
+          except chapter_edit.MarkError as exc:
+            return self._send(409, json.dumps({"error": str(exc)}).encode(), "application/json", cache=None)
+          return self._json({"lines": plan.lines})
+        if url.path == "/api/progress/reset":        # back to unread
+          progress.clear(folder)
+          return self._send(204, b"", "text/plain", cache=None)
+        if url.path == "/api/progress/finish":       # jump the saved place to the last page
+          progress.save(folder, max(0, len(_chapters(folder)) - 1), 1.0)
+          return self._send(204, b"", "text/plain", cache=None)
         if url.path == "/api/bookmark":
           if not data["on"]:
             bookmarks.set_marked(folder, folder.parent.name, folder.name, False)

@@ -98,6 +98,24 @@
       read.href = readUrl(1);
     }
 
+    // "Mark as finished" / "Mark as unread" (clears the saved place). Shown only when they would change something.
+    const hasProgress = saved.index !== undefined;
+    const isFinished = hasProgress && saved.index + 1 >= pages.length;
+    $("finish").hidden = isFinished;
+    $("reset").hidden = !hasProgress;
+    async function setProgress(action, question) {
+      if (hasProgress && !confirm(question)) return;
+      try {
+        const res = await fetch("/api/progress/" + action + "?" + query, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+        });
+        if (!res.ok) throw new Error();
+        location.reload();
+      } catch (_) { alert("Could not save. Is read mode still running in the terminal?"); }
+    }
+    $("finish").onclick = () => setProgress("finish", "Mark \"" + data.title + "\" as finished? Your saved page will be replaced.");
+    $("reset").onclick = () => setProgress("reset", "Mark \"" + data.title + "\" as unread? Your saved page will be forgotten. Bookmarks are kept.");
+
     // "Go to bookmark" opens the reader on the marked page; it follows the bookmark as it changes
     const showMark = (mark) => {
       $("goto-mark").hidden = !mark || !mark.page;
