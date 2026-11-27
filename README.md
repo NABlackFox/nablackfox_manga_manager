@@ -6,6 +6,7 @@ It has two parts that share one library folder:
 
 - **Terminal side** (the *Manager*): collects downloaded zips, unzips, merges, edits chapters, deletes pages, converts images to WebP.
 - **Web side** (the *Reader*): a private reader that runs only on your own computer. Library, search, bookmarks, reading progress, a page/scroll reader.
+- **Downloader** (optional): a second local web page that searches an author through the nhentai API and downloads the zips you pick into your zip folder.
 
 Nothing is uploaded anywhere. The reader listens on `127.0.0.1` only, so no other device can reach it.
 
@@ -54,7 +55,22 @@ ZIP_SOURCE_FOLDER=/home/yourname/Downloads
 | Setting | What it is | If you leave it out |
 |---|---|---|
 | `MANGA_ROOT` | The "mother folder" of your library: one folder per author inside it | a folder called `manga` next to `main.py` |
-| `ZIP_SOURCE_FOLDER` | Where your browser saves downloaded zips; used by *Grab zip file* | your user `Downloads` folder |
+| `ZIP_SOURCE_FOLDER` | Where your browser saves downloaded zips; used by *Grab zip file* and by the downloader | your user `Downloads` folder |
+| `NHENTAI_API_KEY` | Your API key from the nhentai account settings (downloader only) | the downloader works but asks for a key |
+| `NHENTAI_HIDE_TAGS` | Tags the downloader should never show: tag names and/or tag ids, separated by commas | nothing hidden |
+
+Optional extras for the downloader: `NHENTAI_USER_AGENT` (how the tool introduces itself to the API), `NHENTAI_API_BASE` (defaults to `https://nhentai.net/api/v2`), and the per-minute limits `NHENTAI_SEARCH_PER_MINUTE` (12), `NHENTAI_DETAIL_PER_MINUTE` (30), `NHENTAI_DOWNLOAD_PER_MINUTE` (6).
+
+Example `.env` with the downloader set up:
+
+```env
+MANGA_ROOT=D:\Manga
+ZIP_SOURCE_FOLDER=C:\Users\YourName\Downloads
+NHENTAI_API_KEY=paste-your-key-here
+NHENTAI_HIDE_TAGS=some tag, 12345
+```
+
+Keep the key private: never paste it into chat, a screenshot or a shared folder. It is only used by the local downloader server, never by the reading pages.
 
 Tips:
 
@@ -73,12 +89,12 @@ Tips:
 Manga/                                  <- MANGA_ROOT
 ├── Kuromotokun/                        <- author folder
 │   ├── author.webp                     <- optional: an image directly here is the author's picture
-│   ├── Some Title.zip <- zip waiting to be unzipped (Unzip manga)
-│   ├── Another Title/ <- an unzipped chapter: just pages
+│   ├── nhentai-325605 - Some Title.zip <- zip waiting to be unzipped (Unzip manga)
+│   ├── nhentai-430708 - Another Title/ <- an unzipped chapter: just pages
 │   │   ├── 001.webp
 │   │   ├── 002.webp
 │   │   └── 003.webp
-│   └──Some Title Chapters 1-3/   <- a MERGED manga
+│   └── [Kuromotokun] 325605 Some Title Chapters 1-3/   <- a MERGED manga
 │       ├── 001-chapter1.webp           <- first page of chapter 1
 │       ├── 002.webp
 │       ├── 003.webp
@@ -113,17 +129,18 @@ Files the program creates next to `main.py` (safe to delete; they just reset wha
 ## 4. Starting the program
 
 ```bash
-python main.py            # asks: 1 = Read, 2 = Manager
+python main.py            # asks: 1 = Read, 2 = Manager, 3 = Download
 python main.py read       # open the reader straight away
 python main.py manage     # open the Manager straight away
+python main.py download   # open the Downloader straight away
 python main.py -h         # show the help
 ```
 
 On Windows you can use `py main.py` instead of `python main.py`.
 
-These spellings all work: `read`, `-read`, `--read`, `-r` and `manage`, `manager`, `-manage`, `--manage`, `-manager`, `--manager`, `-m`.
+These spellings all work: `read`, `-read`, `--read`, `-r`; `manage`, `manager`, `-manage`, `--manage`, `-manager`, `--manager`, `-m`; `download`, `-download`, `--download`, `-d`.
 
-Started **without** an argument, you get the start menu (press `1` or `2`, `Esc` to exit). Started **with** an argument, the program does that one thing and exits when you are done.
+Started **without** an argument, you get the start menu (press `1`, `2` or `3`, `Esc` to exit). Started **with** an argument, the program does that one thing and exits when you are done.
 
 ---
 
@@ -133,13 +150,17 @@ Started **without** an argument, you get the start menu (press `1` or `2`, `Esc`
 
 Starts the web reader on a free local port, opens your browser at it, and keeps it running. **Press Enter in the terminal to stop it** and go back. (The address changes each time, but your progress and bookmarks are stored in files, so nothing is lost.)
 
-### 5.2 Manager: choosing an author
+### 5.2 Download mode
+
+Starts the downloader (section 7) on its own free local port and opens it in your browser. It warns you if no `NHENTAI_API_KEY` is set. **Press Enter in the terminal to stop it** and go back; downloads still waiting are dropped. The zips it saves are then handled by **Admin > Grab zip file** in the Manager, as before.
+
+### 5.3 Manager: choosing an author
 
 - Type an author name (Tab completes it) and press Enter to open that author's menu.
 - Type `admin` to open the Admin menu.
 - Enter on an empty line refreshes the list. `Esc` goes back to the start menu. `Ctrl+C` exits.
 
-### 5.3 Author menu (works on the chosen author's folder)
+### 5.4 Author menu (works on the chosen author's folder)
 
 | # | Function | What it does |
 |---|---|---|
@@ -157,7 +178,7 @@ Starts the web reader on a free local port, opens your browser at it, and keeps 
 | 2 | **Add Missing Chapter** | Inserts a chapter in the middle; the chapters after it shift. |
 | 3 | **Update Chapter** | Replaces a chapter with a longer or shorter version; the pages after it shift. |
 
-### 5.4 Admin menu
+### 5.5 Admin menu
 
 | # | Function | What it does |
 |---|---|---|
@@ -167,7 +188,7 @@ Starts the web reader on a free local port, opens your browser at it, and keeps 
 
 ---
 
-## 6. Web functions
+## 6. Web functions (the reader)
 
 ### 6.1 Library (home page)
 
@@ -248,7 +269,33 @@ Same cards, filters, search and random button, limited to one author.
 
 ---
 
-## 7. Good to know
+## 7. Downloader (admin web page)
+
+A separate local page, started with `python main.py download`. It runs on its own port, so your API key never goes near the reading pages. It is a modular monolith in the `admin/` folder: `shared` (API client, rate limiting), `search` (author search and the tag filter) and `downloads` (the queue); each module has its own templates and static files.
+
+How you use it:
+
+1. Find an author you like on the main site, then type the author's name in the search box and press Enter. Choose **Artist** (exact artist tag) or **Any text** (also finds circle / group names inside titles).
+2. You get the author's manga, newest first, with covers, page count and likes. A badge shows **In library** (you already have it) or **Zip waiting** (the zip is already in the zip folder). **Load more** shows the next page of results.
+3. Click manga to tick them (or **Select all new**, which skips the ones you already have), then press **Download**.
+4. The **Downloads** panel shows each one: waiting, downloading with a progress bar, saved, skipped or failed (with the reason and *Try again*). **Cancel waiting** and **Clear finished** tidy the list.
+5. The zips land in `ZIP_SOURCE_FOLDER`, named `nhentai-<id> - <title>.zip`. Then use the terminal as usual: **Admin > Grab zip file**, **Unzip manga**, **Convert to WebP**, **Merge manga**.
+
+**The filter (hide tags).** Open *Filters* and list the tags you do not want to see, separated by commas. A **name** is added to the search as `-tag:"name"`; a **number** is a tag id and hides any result that carries it. Results with tags blacklisted on your account are hidden too (tick box). You can also put the list in `.env` as `NHENTAI_HIDE_TAGS`. The exact tag names or ids are for you to fill in.
+
+**Rate limits.** Every call waits for its slot so the API's per-minute limits are respected (search 12/min, details 30/min, downloads 6/min by default, below the documented limits). If the site answers "too many requests" the downloader waits as long as it asks and tries again, up to 4 times. Downloads run one at a time.
+
+**Safety.**
+- Both local servers (reader and downloader) listen on `127.0.0.1` only and refuse requests that do not come from their own pages, so another website open in your browser cannot make them do anything.
+- The API key is sent to the API only (never to the image or zip servers) and is never shown in a page.
+- Every downloaded zip is checked **before it is kept**, without extracting it: it must be a real zip, must not hold programs or scripts (`.exe`, `.bat`, `.js`, `.html`, `.svg`, ...), must not use file paths that point outside its folder, and must not unzip to an absurd size. A zip that fails is deleted and the job says why. Unzipping in the Manager also blocks unsafe paths, and the reader only ever opens image files.
+- What cannot be removed: downloading means the site sees your IP address and which account's key you use, and image libraries (Pillow) occasionally have security bugs, so keep it updated with `pip install -U pillow`.
+
+Good to know: the API's exact answers could not be tested without a key, so if something looks off (no covers, an unexpected answer, downloads refused) the page shows the reason. Downloading needs a key that is allowed to download.
+
+---
+
+## 8. Good to know
 
 - **Bookmarks and progress are different things.** Progress is where you stopped reading (automatic). A bookmark is a page you marked on purpose. Resetting progress never removes bookmarks.
 - **Nothing expires.** Progress and bookmarks stay in their files until you change them; there is no timeout. Use *Mark as unread*, or *Clear all reading progress* in the footer, to reset.

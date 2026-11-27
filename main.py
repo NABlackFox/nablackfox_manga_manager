@@ -8,27 +8,31 @@ from terminal.shared.prompts import read_menu_choice
 from terminal.author_menu.author_menu import BACK, ask_for_author, run_author_menu
 from terminal.admin_menu.admin_menu import run_admin_menu
 from terminal.read_page.read_page import run_read_mode
+from terminal.download_page.download_page import run_download_mode
 
 USAGE = """Manga library
 
 Usage:
-  python main.py            ask what to do (1 = read, 2 = manager)
+  python main.py            ask what to do (1 = read, 2 = manager, 3 = download)
   python main.py read       open the library in the browser straight away
   python main.py manage     open the manager straight away
+  python main.py download   open the downloader straight away
 
-Also accepted: -read  --read  -r   and   -manage  --manage  -manager  --manager  -m
+Also accepted: -read  --read  -r   |   -manage  --manage  -manager  --manager  -m
+               -download  --download  -d
 On Windows you can type  py main.py read  instead of  python main.py read.
 """
 
-# every spelling of an argument -> "read" or "manage"
+# every spelling of an argument -> "read", "manage" or "download"
 ALIASES = {
     "read": "read", "r": "read",
     "manage": "manage", "manager": "manage", "m": "manage",
+    "download": "download", "downloader": "download", "d": "download",
 }
 
 
 def parse_mode(args):
-  """'read', 'manage' or None (ask). Exits with a short help text for -h or something unknown."""
+  """'read', 'manage', 'download' or None (ask). Exits with a short help text for -h or something unknown."""
   if not args:
     return None
   word = args[0].lstrip("-").casefold()
@@ -43,15 +47,16 @@ def parse_mode(args):
 
 
 def ask_mode():
-  """The start menu. Returns 'read', 'manage', or None to quit (Esc)."""
+  """The start menu. Returns 'read', 'manage', 'download', or None to quit (Esc)."""
   clear_screen()
   print_header(MANGA_ROOT, f"Library: {MANGA_ROOT}")
   print(f"  {BOLD}What do you want to do?{RESET}\n")
   print(f"  {YELLOW}1{RESET}  Read      {DIM}open the library in your browser{RESET}")
   print(f"  {YELLOW}2{RESET}  Manager   {DIM}unzip, merge and edit manga{RESET}")
-  print(f"\n  {DIM}Press 1 or 2. Esc or Ctrl+C to exit.{RESET}\n")
-  choice = read_menu_choice(("1", "2"))
-  return {"1": "read", "2": "manage"}.get(choice)
+  print(f"  {YELLOW}3{RESET}  Download  {DIM}search an author and download zips{RESET}")
+  print(f"\n  {DIM}Press 1, 2 or 3. Esc or Ctrl+C to exit.{RESET}\n")
+  choice = read_menu_choice(("1", "2", "3"))
+  return {"1": "read", "2": "manage", "3": "download"}.get(choice)
 
 
 def run_manager():
@@ -89,6 +94,8 @@ def main():
         break
       if mode == "read":
         run_read_mode(MANGA_ROOT)
+      elif mode == "download":
+        run_download_mode(MANGA_ROOT)
       else:
         run_manager()
       if forced:       # started with an argument: stop when that part is done

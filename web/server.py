@@ -93,6 +93,15 @@ def make_handler(manga_root):
     def _not_found(self):
       self._send(404, b"Not found", "text/plain")
 
+    def _allowed(self):
+      """Only this computer's own pages may talk to the server. Blocks other websites open in your browser
+      (they could otherwise post to 127.0.0.1) and DNS-rebinding tricks."""
+      port = self.server.server_address[1]
+      if self.headers.get("Host") not in (f"127.0.0.1:{port}", f"localhost:{port}"):
+        return False
+      origin = self.headers.get("Origin")
+      return origin is None or origin in (f"http://127.0.0.1:{port}", f"http://localhost:{port}")
+
     def _template(self, name):
       html = _find(TEMPLATE_ROOTS, name).read_text(encoding="utf-8")
       html = INCLUDE.sub(
@@ -111,6 +120,8 @@ def make_handler(manga_root):
     # ----- routing -----
 
     def do_GET(self):
+      if not self._allowed():
+        return self._send(403, b"Forbidden", "text/plain")
       url = urlparse(self.path)
       query = {k: v[0] for k, v in parse_qs(url.query).items()}
       author, manga = query.get("a"), query.get("m")
@@ -146,6 +157,10 @@ def make_handler(manga_root):
           pass
 
     def do_POST(self):
+      if not self._allowed():
+        return self._send(403, b"Forbidden", "text/plain")
+      if not self.headers.get("Content-Type", "").startswith("application/json"):
+        return self._send(415, b"Expected JSON", "text/plain")   # a plain form post from another site cannot send this
       url = urlparse(self.path)
       query = {k: v[0] for k, v in parse_qs(url.query).items()}
       if url.path not in ("/api/progress", "/api/bookmark", "/api/progress/reset", "/api/progress/finish", "/api/progress/clear-all",
