@@ -7,7 +7,7 @@ import threading
 import config
 from admin.shared.nhentai_client import ApiError
 
-CACHE_PATH = config.PROJECT_ROOT / ".nhentai_blacklist.json"
+CACHE_PATH = config.PROJECT_ROOT / "nhentai_blacklist.json"
 
 _ids = set()
 _lock = threading.Lock()
