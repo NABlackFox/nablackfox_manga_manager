@@ -3,7 +3,6 @@ import shutil
 import zipfile
 from terminal.shared.utils import natural_key
 
-META_FILE_NAME = "meta.json"
 
 def list_zips(folder):
   """Return the zip files in a folder, sorted by the number in the name."""
@@ -53,7 +52,6 @@ def unzip_one(zip_file, output_folder):
   try:
     with zipfile.ZipFile(zip_file) as zf:
       extract_flat(zf, output_folder)
-    (output_folder / META_FILE_NAME).unlink(missing_ok=True)
   except BaseException:
     shutil.rmtree(output_folder, ignore_errors=True)
     raise
