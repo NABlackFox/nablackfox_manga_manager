@@ -7,6 +7,7 @@ import json
 import mimetypes
 import re
 import threading
+from admin.shared.account_blacklist import refresh
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -137,6 +138,7 @@ def start_server(port=0, client=None, queue=None):
   """Start the downloader on a local port (0 = any free one). Returns (server, url)."""
   client = client or Client(config.NHENTAI_API_BASE, config.NHENTAI_API_KEY, config.NHENTAI_USER_AGENT,
                             config.NHENTAI_LIMITS_PER_MINUTE)
+  refresh(client)
   queue = queue or DownloadQueue(client, config.ZIP_SOURCE_FOLDER)
   server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(client, queue))
   server.daemon_threads = True
