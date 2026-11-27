@@ -1,6 +1,7 @@
 __pycache__/
 .env
 .reader_cache/
+.nhentai_blacklist.json
 reader_progress.json
 webp_converted.json
 bookmarks.json
