@@ -13,13 +13,15 @@
   {{> brand}}
   <div class="loadbar" id="loadbar" hidden><i></i></div>
   <form class="header-tools" id="search-form" role="search">
-    <select id="mode" aria-label="Search by" title="Artist: exact artist tag. Any text: also finds group / circle names in titles.">
+    <select id="mode" aria-label="Search by"
+      title="Artist: search artist tags. Group: search group / circle tags. Any text: search titles and other matching text.">
       <option value="artist">Artist</option>
+      <option value="group">Group</option>
       <option value="text">Any text</option>
     </select>
     <label class="search wide">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input type="search" id="q" placeholder="Author name" aria-label="Author name" autocomplete="off" autofocus>
+      <input type="search" id="q" placeholder="Artist, group or title" aria-label="Search term" autocomplete="off" autofocus>
       <kbd>/</kbd>
     </label>
     <button class="btn" type="submit" id="search-btn">Search</button>
@@ -45,14 +47,14 @@
   <div class="layout">
     <section class="results">
       <div class="page-title">
-        <h1 id="heading">Search an author</h1>
+        <h1 id="heading">Search mangas</h1>
         <span class="count" id="count"></span>
         <div class="tools" id="pick-tools" hidden>
           <button class="chip" type="button" id="select-new">Select all new</button>
           <button class="chip" type="button" id="select-none">Clear selection</button>
         </div>
       </div>
-      <p class="empty" id="message" role="status" aria-live="polite">Type the author's name above and press Enter.</p>
+      <p class="empty" id="message" role="status" aria-live="polite">Enter an artist, group or title above and press Enter.</p>
       <div class="grid" id="grid"></div>
       <div class="more" id="more" hidden>
         <button class="btn ghost" id="load-more" type="button">Load more</button>

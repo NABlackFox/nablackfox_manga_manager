@@ -45,7 +45,12 @@ def build_query(text, mode, hide_names):
   Every hidden tag name is added as -tag:"name".
   """
   text = text.replace('"', " ").strip()
-  parts = [f'artist:"{text}"' if mode == "artist" else f'"{text}"']
+  if mode == "artist":
+    parts = [f'artist:"{text}"']
+  elif mode == "group":
+    parts = [f'group:"{text}"']
+  else:
+    parts = [f'"{text}"']
   parts += [f'-tag:"{name}"' for name in hide_names]
   return " ".join(parts)
 
@@ -152,7 +157,11 @@ def search_author(client, text, page=1, hide="", hide_account_blacklist=True, mo
   hide_names = list(dict.fromkeys(env_names + ui_names))
   hide_ids = env_ids | ui_ids
 
-  query = build_query(text, mode if mode in ("artist", "text") else "artist", hide_names)
+  query = build_query(
+    text,
+    mode if mode in ("artist", "group", "text") else "artist",
+    hide_names
+  )
   payload = client.request("GET", "/search", {"query": query, "sort": "date", "page": page}, group="search")
   galleries, num_pages = extract_page(payload)
 

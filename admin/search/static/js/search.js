@@ -108,7 +108,7 @@
       $("count").textContent = shown.length + " manga" + extra;
       $("pick-tools").hidden = shown.length === 0;
       $("more").hidden = !data.more;
-      message(shown.length ? "" : data.hidden ? "Everything on this page was hidden by your filter." : "Nothing found for this author.");
+      message(shown.length ? "" : data.hidden ? "Everything on this page was hidden by your filter." : "Nothing found for this search.");
     } catch (error) {
       if (mine !== run) return;
       message(error.message);
