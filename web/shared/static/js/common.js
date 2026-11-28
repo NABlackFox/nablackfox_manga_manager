@@ -94,13 +94,17 @@ window.MM = (() => {
   }
 
   // ---------- manga card (library + bookmarks page) ----------
+  // name: the folder name. meta: the short meta.json information from the server (or null); when there is one its
+  //   title is shown instead of the folder name, and the card remembers what to search in (box.doc).
+  // pages: the page count, searchable as pages:>30.
   // href: where the card opens (default: the manga page).
   // readAtMark: open the reader at the bookmarked page instead (falls back to the manga page without a bookmark).
-  function card({ author, manga, name, sub, progress, bookmarked, onBookmark, href, readAtMark }) {
+  function card({ author, manga, name, sub, progress, bookmarked, onBookmark, href, readAtMark, meta, pages }) {
     const q = mangaQuery(author, manga);
+    const shown = MM.meta.title(meta, name);
     const box = document.createElement("div");
     box.className = "card";
-    box.dataset.name = name.toLowerCase();
+    box.doc = MM.meta.doc({ name, author, pages, meta });
     box.dataset.status = progress >= 1 ? "done" : progress > 0 ? "reading" : "unread";
 
     const a = document.createElement("a");
@@ -110,7 +114,7 @@ window.MM = (() => {
     cover.className = "cover";
     const initial = document.createElement("div");
     initial.className = "initial";
-    initial.textContent = (name.trim()[0] || "?").toUpperCase();
+    initial.textContent = (shown.trim()[0] || "?").toUpperCase();
     cover.appendChild(initial);
     const img = document.createElement("img");
     img.loading = "lazy"; img.alt = ""; img.src = "/thumb?" + q;
@@ -130,7 +134,8 @@ window.MM = (() => {
     a.appendChild(cover);
 
     const title = document.createElement("div");
-    title.className = "name"; title.textContent = name; title.title = name;
+    title.className = "name"; title.textContent = shown;
+    title.title = meta && meta.japanese && meta.japanese !== shown ? shown + "\n" + meta.japanese : shown;
     a.appendChild(title);
     if (sub) {
       const s = document.createElement("div");
@@ -174,6 +179,12 @@ window.MM = (() => {
       title.textContent = "Keyboard shortcuts";
       const dl = document.createElement("dl");
       for (const [keys, text] of list.concat([["?", "Show / hide this list"]])) {
+        if (keys === "#") {              // a heading row
+          const h = document.createElement("h3");
+          h.className = "help-sub"; h.textContent = text;
+          dl.appendChild(h);
+          continue;
+        }
         const dt = document.createElement("dt");
         keys.split(" ").forEach((k) => { const kbd = document.createElement("kbd"); kbd.textContent = k; dt.appendChild(kbd); });
         const dd = document.createElement("dd");
@@ -203,7 +214,7 @@ window.MM = (() => {
       try {
         const res = await fetch("/api/progress/clear-all", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
         if (!res.ok) throw new Error();
-        try { localStorage.removeItem("library-cache-v2"); } catch (_) {}   // the cached library still has the old progress
+        try { localStorage.removeItem("library-cache-v3"); } catch (_) {}   // the cached library still has the old progress
         location.reload();
       } catch (_) { alert("Could not clear. Is read mode still running in the terminal?"); }
     });

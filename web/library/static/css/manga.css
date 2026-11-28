@@ -17,19 +17,13 @@
 .eyebrow a:hover { text-decoration: underline; }
 .hero h1 { margin: 0 0 14px; font-size: clamp(24px, 4vw, 38px); line-height: 1.1; letter-spacing: -.015em; overflow-wrap: anywhere; }
 
-.facts { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; padding: 0; list-style: none; }
-.facts li {
-  padding: 3px 12px; border: 1px solid var(--line); border-radius: 99px;
-  background: var(--surface); color: var(--dim); font-size: 12px;
-}
-.facts b { color: var(--ink); font-weight: 600; }
-
 .meter { max-width: 420px; margin: 0 0 20px; }
 .meter-label { display: flex; justify-content: space-between; margin-bottom: 6px; color: var(--dim); font-size: 12px; }
 .meter-track { height: 4px; overflow: hidden; border-radius: 99px; background: var(--line); }
 .meter-fill { height: 100%; width: 0; background: var(--accent); transition: width .4s var(--ease); }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; }
 
+.details { margin-bottom: 36px; padding-bottom: 32px; border-bottom: 1px solid var(--line); }
 .section-title { display: flex; align-items: baseline; gap: 10px; margin: 0 0 16px; font-size: 18px; }
 .section-title span { color: var(--dim); font-size: 13px; font-weight: 400; }
 

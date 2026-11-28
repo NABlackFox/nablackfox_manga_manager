@@ -48,7 +48,7 @@ def extract_flat(zf, output_folder):
       shutil.copyfileobj(source, destination)
 
 def unzip_one(zip_file, output_folder):
-  """Unzip one zip into its own folder, delete meta.json, then delete the zip."""
+  """Unzip one zip into its own folder (meta.json stays: the reader and the downloader use it), then delete the zip."""
   try:
     with zipfile.ZipFile(zip_file) as zf:
       extract_flat(zf, output_folder)

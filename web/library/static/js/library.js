@@ -9,11 +9,20 @@
   const isFiltering = () => $("search").value.trim() !== "" || status !== "all";
 
   // ---------- cards ----------
+  // "48 pages · ♥ 13.5K · page 12": favorites come from meta.json, so only manga that have one show them
+  const cardSub = (m) => [
+    m.pages + " pages",
+    m.meta && m.meta.favorites !== undefined ? "♥ " + MM.meta.compact(m.meta.favorites) : "",
+    m.read ? "page " + m.read : "",
+  ].filter(Boolean).join(" · ");
+
   const mangaCards = (authorName, manga) => manga.map((m) => MM.card({
     author: authorName,
     manga: m.name,
     name: m.name,
-    sub: m.pages + " pages" + (m.read ? " · page " + m.read : ""),
+    meta: m.meta,
+    pages: m.pages,
+    sub: cardSub(m),
     progress: m.read / m.pages,
     bookmarked: m.bookmarked,
     onBookmark: (mark) => {          // keep the cached library in step, so a reload shows the right star
@@ -67,11 +76,13 @@
     sec.cards = mangaCards(authorName, manga);
     sec.grid.append(...sec.cards);
     sec.loaded = true;
+    if (tagPanel) tagPanel.invalidate();
   }
 
   function mount(list) {
     const y = window.scrollY;          // rebuilding the page must not throw you back to the top
     sections = list;
+    if (tagPanel) tagPanel.invalidate();
     $("groups").replaceChildren(...list.map((sec) => sec.el));
     window.scrollTo(0, y);
   }
@@ -103,17 +114,17 @@
   const updateRecent = () => { $("recent").hidden = isFiltering() || !$("rail").children.length; };
 
   // ---------- filter + counts ----------
+  // The search box understands words, tag:name, -tag:name, artist:, pages:>30 ... (see the top of meta.js).
+  // Every card carries what is searched (c.doc: folder name, titles, author, tags ...).
   function render() {
-    const needle = $("search").value.trim().toLowerCase();
+    const query = MM.meta.parse($("search").value);
     let shown = 0, total = 0;
     const letterHasMatch = new Set();
 
     for (const sec of sections) {
-      // typing an author's name shows all of their manga; otherwise match the manga name
-      const authorHit = needle && sec.title.toLowerCase().includes(needle);
       let visible = 0;
       for (const c of sec.cards) {
-        const match = (!needle || authorHit || c.dataset.name.includes(needle))
+        const match = MM.meta.matches(query, c.doc)
           && (status === "all" || c.dataset.status === status);
         c.hidden = !match;
         if (match) visible++;
@@ -133,6 +144,7 @@
     $("empty").hidden = shown > 0 || loading;
     $("count").textContent = (isFiltering() ? shown + " / " + total : total) + " manga" + (loading ? " ..." : "");
     updateRecent();
+    if (tagPanel) tagPanel.update();
   }
 
   let queued = false;
@@ -146,7 +158,8 @@
   // Library data is cached in localStorage and shown instantly; a fresh copy is fetched in
   // the background and the page is only rebuilt if something changed (e.g. reading progress).
   // The scroll position is remembered per tab in sessionStorage.
-  const CACHE_KEY = "library-cache-v2";
+  const CACHE_KEY = "library-cache-v3";            // v3: manga carry their meta.json information
+  try { localStorage.removeItem("library-cache-v2"); } catch (_) {}
   const SCROLL_KEY = "scroll:" + location.pathname + location.search;
 
   function readCache() {
@@ -299,6 +312,8 @@
         author: m.author,
         manga: m.name,
         name: m.name,
+        meta: m.meta,
+        pages: m.pages,
         sub: m.author + " · page " + m.read + " / " + m.pages,
         progress: m.read / m.pages,
         bookmarked: m.bookmarked,
@@ -332,8 +347,17 @@
   }
   $("random").addEventListener("click", openRandom);
 
+  // ---------- tag filter panel ----------
+  // It reads the cards that are loaded and edits the search box, so the search box stays the one place the filter lives.
+  const tagPanel = MM.tagPanel({
+    input: $("search"),
+    cards: () => sections.flatMap((s) => s.cards),
+    loaded: () => sections.length > 0 && sections.every((s) => s.loaded),
+    onChange: render,
+  });
+
   // ---------- events ----------
-  $("search").value = params.get("q") || "";     // /?q=... comes from the search box on other pages
+  $("search").value = params.get("q") || "";     // /?q=... comes from the search box on other pages and from tags
   $("search").addEventListener("input", render);
   // Enter with exactly one match opens it
   $("search").addEventListener("keydown", (e) => {
@@ -344,12 +368,14 @@
   document.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName);
-    if (e.key === "/" && document.activeElement !== $("search")) { e.preventDefault(); $("search").focus(); }
+    if (e.key === "/" && !typing) { e.preventDefault(); $("search").focus(); }
     else if (e.key === "Escape") { $("search").value = ""; $("search").blur(); render(); }
     else if (e.key === "r" && !typing) openRandom();
+    else if (e.key === "t" && !typing) tagPanel.toggle();
   });
-  MM.shortcuts([["/", "Search manga and authors"], ["Enter", "Open the match (when only one is left)"],
-    ["Esc", "Clear the search"], ["r", "Open a random manga from what is shown"]]);
+  MM.shortcuts([["/", "Search manga, authors and tags"], ["Enter", "Open the match (when only one is left)"],
+    ["Esc", "Clear the search"], ["r", "Open a random manga from what is shown"], ["t", "Show / hide the tag filter"],
+    ...MM.meta.searchHelp]);
   // back from the reader: refresh reading progress
   window.addEventListener("pageshow", (e) => {
     if (!e.persisted) return;

@@ -103,3 +103,41 @@
   transition: background .15s, color .15s;
 }
 .toggle:hover, .toggle:focus-visible { background: var(--accent); color: var(--accent-ink); }
+
+/* "Tags" button with a counter of the tag filters in use */
+.chip-n {
+  display: inline-block; min-width: 16px; height: 16px; margin-left: 6px; padding: 0 4px; border-radius: 99px;
+  background: var(--accent); color: var(--accent-ink); font-size: 11px; font-weight: 650; line-height: 16px; text-align: center;
+}
+.chip.small { height: 26px; padding: 0 10px; font-size: 12px; }
+
+/* tag filter panel (library + author pages) */
+.tagpanel {
+  margin: 0 0 26px; padding: 14px 16px 12px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
+}
+.tagpanel-top { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; }
+.tagfind {
+  width: min(220px, 100%); height: 32px; padding: 0 12px;
+  background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius); font: inherit;
+}
+.tagfind::placeholder { color: var(--faint); }
+.tagfind:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.tagtypes { display: flex; flex-wrap: wrap; gap: 6px; }
+.tagpanel-top .linklike { margin-left: auto; font-size: 12px; color: var(--dim); }
+.tagcloud { display: flex; flex-wrap: wrap; gap: 6px; max-height: 214px; margin-top: 12px; padding: 2px; overflow-y: auto; scrollbar-width: thin; }
+.tagchip {
+  display: inline-flex; align-items: baseline; gap: 6px; height: 28px; padding: 0 11px;
+  background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); border-radius: 99px;
+  font: inherit; font-size: 13px; line-height: 26px; cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.tagchip:hover { border-color: var(--accent); }
+.tagchip .kind { color: var(--faint); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+.tagchip .n { color: var(--dim); font-size: 11px; font-variant-numeric: tabular-nums; }
+.tagchip[data-state="in"] { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.tagchip[data-state="out"] { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
+.tagchip[data-state="out"] .label { text-decoration: line-through; text-decoration-thickness: 1px; }
+.tagnote { margin: 10px 0 0; color: var(--dim); font-size: 12px; }
+.tagnote:empty { display: none; }
+.taghint { margin: 8px 0 0; color: var(--faint); font-size: 12px; }

@@ -24,8 +24,10 @@
   /* ---------- build ---------- */
   function build(data) {
     pages = data.pages;
-    $("title").textContent = data.title;
-    document.title = data.title;
+    const title = MM.meta.title(data.meta, data.title);     // the real title from meta.json when there is one
+    $("title").textContent = title;
+    document.title = title;
+    buildInfo(data.meta, title);
 
     const observer = new IntersectionObserver((entries) => {
       for (const entry of entries) {
@@ -62,7 +64,7 @@
     const end = document.createElement("div");
     end.className = "end";
     const text = document.createElement("div");
-    text.textContent = "End of " + data.title;
+    text.textContent = "End of " + title;
     const top = document.createElement("button");
     top.className = "btn ghost"; top.type = "button"; top.textContent = "Back to top";
     top.onclick = () => window.scrollTo({ top: 0 });
@@ -219,6 +221,32 @@
     window.scrollTo(0, 0);
   }
 
+  /* ---------- info panel: title, facts and tags from meta.json ---------- */
+  const infoPanel = $("info-panel"), infoButton = $("info");
+  const infoOpen = () => !infoPanel.hidden;
+  function buildInfo(meta, title) {
+    if (!meta) return;                       // a manga without meta.json: no Info button at all
+    $("info-title").textContent = title;
+    if (meta.japanese && meta.japanese !== title) { $("info-alt").textContent = meta.japanese; $("info-alt").hidden = false; }
+    MM.meta.facts(meta).forEach((fact) => $("info-facts").appendChild(MM.meta.factItem(fact)));
+    const tags = MM.meta.renderTags(meta, { newTab: true });     // a tag opens the library in a new tab: this tab keeps your place
+    if (tags) $("info-tags").appendChild(tags);
+    infoButton.hidden = false;
+  }
+  function setInfo(show) {
+    if (infoButton.hidden) return;
+    infoPanel.hidden = !show;
+    infoButton.classList.toggle("on", show);
+  }
+  infoButton.onclick = () => setInfo(!infoOpen());
+  $("info-close").onclick = () => setInfo(false);
+  // a click anywhere else closes it, and is not also taken as "next page"
+  document.addEventListener("click", (e) => {
+    if (!infoOpen() || infoPanel.contains(e.target) || infoButton.contains(e.target)) return;
+    setInfo(false);
+    e.stopPropagation(); e.preventDefault();
+  }, true);
+
   /* ---------- controls ---------- */
   function isAtChapterStart() {
     const atStart = chapters[chapterOf(current)].index === current;
@@ -267,6 +295,7 @@
 
   document.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey || e.target === select) return;
+    if (e.key === "Escape" && infoOpen()) { setInfo(false); e.preventDefault(); return; }
     if (paged) {
       const forward = { ArrowRight: 1, PageDown: 1, " ": e.shiftKey ? -1 : 1 };
       const back = { ArrowLeft: -1, PageUp: -1 };
@@ -284,6 +313,7 @@
       case "-": case "_": $("narrower").click(); break;
       case "b": if (bookmark) bookmark.toggle(); break;
       case "c": markChapter(); break;
+      case "i": setInfo(!infoOpen()); break;
       case "f": toggleFullscreen(); break;
       case "h": barLocked = !barLocked; bar.classList.toggle("hidden", barLocked); break;
       default: return;
@@ -297,7 +327,7 @@
   MM.shortcuts([
     ["← →", "Previous / next page (page mode)"], ["Space", "Next page (Shift: previous)"],
     ["Home End", "First / last page (page mode)"], ["p n", "Previous / next chapter"],
-    ["b", "Bookmark this page"], ["c", "Start a new chapter on this page"], ["m", "Page mode / scroll mode"], ["w", "Fit screen / fit width"],
+    ["b", "Bookmark this page"], ["i", "About this manga (title, tags)"], ["c", "Start a new chapter on this page"], ["m", "Page mode / scroll mode"], ["w", "Fit screen / fit width"],
     ["+ -", "Wider / narrower"], ["f", "Fullscreen"], ["h", "Lock the top bar hidden"],
   ]);
 

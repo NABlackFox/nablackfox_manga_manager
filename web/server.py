@@ -17,8 +17,8 @@ from web.reader import chapters as chapter_edit, progress
 from web.library.library import (
     author_thumb_source, find_author, find_manga, manga_thumb_source, scan_pages,
 )
+from web.library import meta as gallery_meta
 from web.library.thumbs import make_thumb
-from web.reader import progress
 
 WEB_FOLDER = Path(__file__).resolve().parent
 DOMAINS = ("shared", "library", "reader", "bookmarks")
@@ -244,6 +244,7 @@ def make_handler(manga_root):
             "pages": len(images),
             "read": saved.get("index") + 1 if "index" in saved else 0,
             "bookmarked": _bookmark_info(item, marked[str(item.resolve())]) if str(item.resolve()) in marked else None,
+            "meta": gallery_meta.brief(gallery_meta.read(item)),     # from meta.json; None for manga without one
         })
       return {"name": folder.name, "manga": manga}
 
@@ -261,6 +262,7 @@ def make_handler(manga_root):
             "pages": len(list_images(folder)),
             "read": saved.get("index") + 1 if "index" in saved else 0,
             "bookmarked": _bookmark_info(folder, entry),
+            "meta": gallery_meta.brief(gallery_meta.read(folder)),
         })
       return items
 
@@ -285,6 +287,7 @@ def make_handler(manga_root):
             "pages": pages,
             "read": read,
             "bookmarked": _bookmark_info(folder, mark) if mark else None,
+            "meta": gallery_meta.brief(gallery_meta.read(folder)),
         })
         if len(items) >= limit:
           break
@@ -296,6 +299,7 @@ def make_handler(manga_root):
       return {
           "author": author,
           "title": folder.name,
+          "meta": gallery_meta.read(folder),        # the full gallery information, or None
           "pages": [{"chapter": p["chapter"], "w": p["w"], "h": p["h"]} for p in pages],
           "progress": progress.load(folder),
           "bookmarked": (_bookmark_info(folder, entry) if (entry := bookmarks.get(folder)) else None),

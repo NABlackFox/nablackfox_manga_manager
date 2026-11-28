@@ -14,6 +14,8 @@
       author: m.author,
       manga: m.name,
       name: m.name,
+      meta: m.meta,
+      pages: m.pages,
       sub: m.author + " · " + m.pages + " pages" + (m.read ? " · page " + m.read : ""),
       progress: m.read / m.pages,
       bookmarked: m.bookmarked,
@@ -26,11 +28,12 @@
     $("grid").hidden = items.length === 0;
   }
 
+  // same search language as the library: words, tag:name, -tag:name, artist:, pages:>30 ... (see meta.js)
   $("search").addEventListener("input", () => {
-    const needle = $("search").value.trim().toLowerCase();
-    cards.forEach((c) => { c.hidden = needle !== "" && !c.dataset.name.includes(needle) && !c.querySelector(".sub").textContent.toLowerCase().includes(needle); });
+    const query = MM.meta.parse($("search").value);
+    cards.forEach((c) => { c.hidden = !MM.meta.matches(query, c.doc); });
   });
-  MM.shortcuts([["/", "Filter bookmarks"], ["Esc", "Clear the filter"]]);
+  MM.shortcuts([["/", "Filter bookmarks"], ["Esc", "Clear the filter"], ...MM.meta.searchHelp]);
   document.addEventListener("keydown", (e) => {
     if (e.key === "/" && document.activeElement !== $("search")) { e.preventDefault(); $("search").focus(); }
     else if (e.key === "Escape") { $("search").value = ""; $("search").blur(); $("search").dispatchEvent(new Event("input")); }

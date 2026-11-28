@@ -63,25 +63,35 @@
     $("loadall").hidden = pages.length - shown <= BATCH;   // with 10 or fewer left, "Load 10 more" already does it
   }
 
-  function addFact(html) {
-    const li = document.createElement("li");
-    li.innerHTML = html;
-    $("facts").appendChild(li);
-  }
+  const addFact = (fact) => $("facts").appendChild(MM.meta.factItem(fact));
 
   async function start() {
     const data = await getJson("/api/manga?" + query);
     pages = data.pages;
     const chapters = pages.filter((p) => p.chapter).length;
 
-    document.title = data.title;
-    $("title").textContent = data.title;
-    $("crumb-title").textContent = data.title;
+    // meta.json (when the manga has one) gives the real title, the Japanese title, a few facts and the tags
+    const meta = data.meta;
+    const title = MM.meta.title(meta, data.title);
+    document.title = title;
+    $("title").textContent = title;
+    $("crumb-title").textContent = title;
+    if (meta && meta.japanese && meta.japanese !== title) {
+      $("alt-title").textContent = meta.japanese;
+      $("alt-title").hidden = false;
+    }
     $("cover").src = "/thumb?" + query;
     $("cover").onerror = () => $("cover").remove();
 
-    addFact("<b>" + pages.length + "</b> pages");
-    if (chapters) addFact("<b>" + chapters + "</b> " + (chapters === 1 ? "chapter" : "chapters"));
+    addFact({ value: String(pages.length), after: " pages" });
+    if (chapters) addFact({ value: String(chapters), after: chapters === 1 ? " chapter" : " chapters" });
+    MM.meta.facts(meta).forEach(addFact);
+
+    const tags = MM.meta.renderTags(meta);
+    if (tags) {
+      $("tags").appendChild(tags);
+      $("tags-section").hidden = false;
+    }
 
     const saved = data.progress || {};
     const read = $("read");
@@ -113,8 +123,8 @@
         location.reload();
       } catch (_) { alert("Could not save. Is read mode still running in the terminal?"); }
     }
-    $("finish").onclick = () => setProgress("finish", "Mark \"" + data.title + "\" as finished? Your saved page will be replaced.");
-    $("reset").onclick = () => setProgress("reset", "Mark \"" + data.title + "\" as unread? Your saved page will be forgotten. Bookmarks are kept.");
+    $("finish").onclick = () => setProgress("finish", "Mark \"" + title + "\" as finished? Your saved page will be replaced.");
+    $("reset").onclick = () => setProgress("reset", "Mark \"" + title + "\" as unread? Your saved page will be forgotten. Bookmarks are kept.");
 
     // "Go to bookmark" opens the reader on the marked page; it follows the bookmark as it changes
     const showMark = (mark) => {

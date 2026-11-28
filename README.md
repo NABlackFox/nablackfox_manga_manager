@@ -90,7 +90,8 @@ Manga/                                  <- MANGA_ROOT
 ├── Kuromotokun/                        <- author folder
 │   ├── author.webp                     <- optional: an image directly here is the author's picture
 │   ├── nhentai-325605 - Some Title.zip <- zip waiting to be unzipped (Unzip manga)
-│   ├── nhentai-430708 - Another Title/ <- an unzipped chapter: just pages
+│   ├── nhentai-430708 - Another Title/ <- an unzipped chapter: pages + meta.json
+│   │   ├── meta.json                   <- optional: title, tags, likes ... (see 6.8)
 │   │   ├── 001.webp
 │   │   ├── 002.webp
 │   │   └── 003.webp
@@ -113,6 +114,7 @@ How the names work:
 - **Chapter markers** are part of a page's file name: `004-chapter2.webp` means *chapter 2 starts on page 4*. This is how a merged manga knows where each chapter begins. A folder without markers is read as one long chapter.
 - **Merged folder names** end with `Chapters 1-N`. The terminal tools read `N` (the chapter count) from that name.
 - **Author picture:** an image sitting directly in an author folder (not inside a manga folder) is used as the author's picture.
+- **`meta.json`** (optional) sits next to the pages and holds the gallery information the downloader saved: title, Japanese title, tags, likes, upload date. The reader shows it and searches it (6.8). A manga without one works exactly as before.
 - **Hidden folders** (names starting with a dot) are ignored everywhere.
 
 Files the program creates next to `main.py` (safe to delete; they just reset what they remember):
@@ -194,10 +196,11 @@ Starts the downloader (section 7) on its own free local port and opens it in you
 
 - Authors listed in sections with a **letter bar** (A–Z, `#`) to jump around. Each author shows one row with **Show more / Show less**.
 - **Continue reading** row: the manga you are in the middle of, newest first. Clicking one resumes at the exact place you stopped. It hides while you search or filter, and finished manga are left out.
-- **Search** (press `/`): filters manga **and** authors across the whole library. `Enter` with exactly one match opens it. `Esc` clears.
+- **Search** (press `/`): filters across the whole library by title, author, tags and more (see 6.8 for tags, `-tag:`, `pages:>30` ...). `Enter` with exactly one match opens it. `Esc` clears.
+- **Tags** button (or press `t`): a panel with every tag in the library and how many manga have it. Click a tag to show only manga that have it, click again to hide the ones that do, once more to clear it. It just edits the search box, so you can also type or edit the filter by hand.
 - **Filter buttons**: All, Unread, In progress, Finished. Your choice is remembered.
 - **Random** button (or press `r`): opens a random manga from what is currently shown (pick *Unread* first to get a random unread one).
-- Each card shows a progress bar, a **Finished** badge when you reached the last page, and a star to **bookmark**. A bookmarked card shows where, for example `★ Chapter 3 · page 45`.
+- Each card shows the title from `meta.json` (the folder name when there is none), the page count, the likes (`♥ 13.5K`), a progress bar, a **Finished** badge when you reached the last page, and a star to **bookmark**. A bookmarked card shows where, for example `★ Chapter 3 · page 45`.
 - `/?q=something` opens the library already filtered.
 
 ### 6.2 Author page
@@ -206,7 +209,8 @@ Same cards, filters, search and random button, limited to one author.
 
 ### 6.3 Manga page
 
-- Cover, author, facts (pages, chapters) and your **progress meter**.
+- Cover, author, the title and Japanese title, facts (pages, chapters, ID, likes, upload date, scanlator) and your **progress meter**.
+- **Tags**, grouped as Groups, Parodies, Categories, Languages and Tags. Click any tag to see every manga with it. (Only for manga that have a `meta.json`.)
 - **Start reading** / **Continue from page N**, and **From the start**.
 - **Bookmark** star: bookmarking from here marks the **first chapter**. The button shows what is marked.
 - **Go to bookmark**: opens the reader on the bookmarked page.
@@ -221,6 +225,7 @@ Same cards, filters, search and random button, limited to one author.
 - **Chapter dropdown** and previous / next chapter buttons.
 - **Fit screen / Fit width** (`w`) and **wider / narrower** (`+` / `-`).
 - Fullscreen (`f`), and a top bar that hides itself (`h` locks it hidden). A thin progress line shows how far you are.
+- **Info** button (`i`): title, facts and tags of the manga you are reading (only when it has a `meta.json`). A tag opens the filtered library in a new tab, so the reader keeps your place.
 - Your position is **saved automatically** as you read.
 - **Bookmark this page** (`b`): marks the page you are on. Click again on that page to remove it; click on another page to **move** the bookmark there. The star is filled on the bookmarked page and outlined when the bookmark is elsewhere.
 - **+ Chapter** (`c`): starts a new chapter on the page you are reading (details below).
@@ -237,7 +242,7 @@ Same cards, filters, search and random button, limited to one author.
 
 - Everything you bookmarked, with the marked chapter and page on each card.
 - Clicking a card opens the reader **on the bookmarked page**.
-- Filter box (press `/`). The star on a card removes the bookmark (and brings it back as the first chapter if clicked again).
+- Filter box (press `/`), with the same search language as the library (6.8). The star on a card removes the bookmark (and brings it back as the first chapter if clicked again).
 - A small counter next to **Bookmarks** in the top bar shows how many you have.
 
 ### 6.6 Everywhere
@@ -253,12 +258,14 @@ Same cards, filters, search and random button, limited to one author.
 | Library | `Enter` | open the match (when one is left) |
 | Library | `Esc` | clear the search |
 | Library | `r` | random manga |
+| Library | `t` | show / hide the tag filter |
 | Manga page | `/` | search all manga |
 | Bookmarks | `/` | filter bookmarks |
 | Reader (page mode) | `←` `→`, `PageUp` `PageDown`, `Space` | previous / next page (Shift+Space goes back) |
 | Reader (page mode) | `Home` `End` | first / last page |
 | Reader | `p` `n` (or `[` `]`) | previous / next chapter |
 | Reader | `b` | bookmark this page |
+| Reader | `i` | info: title, facts, tags |
 | Reader | `c` | start a new chapter on this page |
 | Reader | `m` | page mode / scroll mode |
 | Reader | `w` | fit screen / fit width |
@@ -266,6 +273,32 @@ Same cards, filters, search and random button, limited to one author.
 | Reader | `f` | fullscreen |
 | Reader | `h` | lock the top bar hidden |
 | Any page | `?` | show / hide the shortcut list |
+
+### 6.8 Search language and `meta.json`
+
+The search box on the library, author and bookmarks pages understands these. Several words can be combined; **all** of them must match.
+
+| Type | It finds |
+|---|---|
+| `glasses` | a word in the folder name, either title, author, scanlator, ID or any tag |
+| `"big breasts"` | a phrase (quotes) |
+| `tag:glasses` | has a tag containing "glasses" (any kind of tag). With quotes, `tag:"glasses"`, only that exact tag |
+| `artist:` `group:` `parody:` `character:` `language:` `category:` | the same, limited to that kind of tag |
+| `-tag:ahegao`, `-glasses` | **without** it: a minus works in front of anything |
+| `title:` `author:` `scanlator:` | search only that field (`author:` is the library folder) |
+| `pages:>30`, `pages:20-40`, `pages:<=12` | number of pages |
+| `favorites:>1k` (also `likes:`) | likes. `k` = thousand, `m` = million |
+| `year:2021`, `year:2019-2021` | year it was uploaded |
+| `id:374818` | the gallery ID |
+| `has:meta`, `-has:meta` | only manga with / without a `meta.json` (handy for finding old ones) |
+
+Example: `tag:glasses -tag:ahegao language:english pages:>20 favorites:>1k`.
+
+Notes: capitals do not matter. A half-typed term such as `tag:` or `pages:>` is ignored until it is complete. A word with a prefix that is not in the list (such as `re:zero`) is searched as an ordinary word. Press `?` on these pages for this list.
+
+What the reader reads from `meta.json`: `id`, `title.english` / `title.japanese` / `title.pretty`, `upload_date`, `num_favorites`, `scanlator` and `tags` (each with a `type` and a `name`). Pages come from the real image count, not `num_pages`. The file comes from the internet, so every value is checked and shortened, shown only as plain text, and a missing or broken file simply means "no information". Files over 2 MB are ignored.
+
+Merged manga (*Merge manga*) are new folders made of pages only, so they carry no `meta.json` and show their folder name.
 
 ---
 

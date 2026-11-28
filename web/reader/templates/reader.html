@@ -17,6 +17,7 @@
     <button id="next" type="button" title="Next chapter (n)">&#8250;</button>
   </div>
   <button id="bookmark" type="button" title="Bookmark (b)"><svg class="bm-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6L3.4 9.8l6-.8z" stroke-linejoin="round"/></svg></button>
+  <button id="info" type="button" title="About this manga: title, tags (i)" hidden>Info</button>
   <button id="mark-chapter" type="button" title="Start a new chapter on this page (c)">+ Chapter</button>
   <div class="group">
     <button id="mode" type="button" title="Switch between page mode and scroll mode (m)">Page</button>
@@ -30,11 +31,20 @@
   <div class="counter" id="counter"></div>
 </header>
 
+<aside class="info-panel" id="info-panel" aria-label="About this manga" hidden>
+  <button class="info-close" id="info-close" type="button" aria-label="Close">&times;</button>
+  <h2 id="info-title"></h2>
+  <p class="alt-title" id="info-alt" lang="ja" hidden></p>
+  <ul class="facts" id="info-facts"></ul>
+  <div id="info-tags"></div>
+</aside>
+
 <main class="pages" id="pages"></main>
 <div class="viewer" id="viewer"><img id="page-img" alt=""></div>
 <div class="read-progress" id="progress"></div>
 
 <script src="/static/js/common.js"></script>
+<script src="/static/js/meta.js"></script>
 <script src="/static/js/reader.js"></script>
 </body>
 </html>
